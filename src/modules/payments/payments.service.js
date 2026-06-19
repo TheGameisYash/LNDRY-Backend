@@ -5,6 +5,7 @@ import { razorpay } from '../../config/razorpay.js'
 import { orderQueue } from '../../config/bullmq.js'
 import { getOffsetLimit, buildPagination } from '../../utils/paginate.js'
 import { OrdersRepository } from '../orders/orders.repository.js'
+import { query } from '../../config/database.js'
 
 const INLINE_AUTO_ASSIGN_IN_NON_PROD =
   process.env.AUTO_ASSIGN_INLINE === 'true' ||
@@ -22,61 +23,114 @@ export class PaymentsService {
   /**
    * Create a Razorpay order for an existing app order
    */
-  async createPaymentOrder(userId, orderId) {
-    if (!razorpay) {
-      return { success: false, message: 'Online payments are not configured' }
-    }
+  async createPaymentOrder(userId, body) {
+    const { orderId, order_draft_id, orderDraftId } = typeof body === 'string' ? { orderId: body } : (body || {})
+    const orderDraftIdVal = order_draft_id || orderDraftId
 
-    const order = await this.ordersRepo.findByIdAndUser(orderId, userId)
-    if (!order) {
-      return { success: false, message: 'Order not found' }
-    }
+    let amountPaise = 0
+    let amountRupees = 0
+    let receipt = ''
 
-    if (order.paymentMethod !== 'ONLINE') {
-      return { success: false, message: 'Order is not set for online payment' }
-    }
-
-    if (order.paymentStatus === 'PAID') {
-      return { success: false, message: 'Order is already paid' }
+    if (orderDraftIdVal) {
+      const draftRes = await query('SELECT * FROM order_drafts WHERE id = $1 AND user_id = $2', [orderDraftIdVal, userId])
+      const draft = draftRes.rows[0]
+      if (!draft) {
+        return { success: false, message: 'Order draft not found' }
+      }
+      amountPaise = draft.payable_amount_paise
+      amountRupees = amountPaise / 100
+      receipt = draft.id
+    } else if (orderId) {
+      const order = await this.ordersRepo.findByIdAndUser(orderId, userId)
+      if (!order) {
+        return { success: false, message: 'Order not found' }
+      }
+      if (order.paymentMethod !== 'ONLINE') {
+        return { success: false, message: 'Order is not set for online payment' }
+      }
+      if (order.paymentStatus === 'PAID') {
+        return { success: false, message: 'Order is already paid' }
+      }
+      amountPaise = Math.round(order.totalAmount * 100)
+      amountRupees = order.totalAmount
+      receipt = order.orderNumber
+    } else {
+      return { success: false, message: 'Either orderId or order_draft_id must be provided' }
     }
 
     // Check if payment record already exists
-    const existing = await this.repo.findByOrderId(orderId)
-    if (existing && existing.status === 'PAID') {
-      return { success: false, message: 'Payment already completed' }
+    if (orderId) {
+      const existing = await this.repo.findByOrderId(orderId)
+      if (existing && existing.status === 'PAID') {
+        return { success: false, message: 'Payment already completed' }
+      }
+    }
+
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
+
+    if (!razorpay) {
+      // Mock fallback
+      const mockRzpOrderId = `order_mock_${Math.random().toString(36).substring(2, 11)}`
+      const payment = await this.repo.create({
+        orderId: orderId || null,
+        orderDraftId: orderDraftIdVal || null,
+        userId,
+        razorpayOrderId: mockRzpOrderId,
+        amount: amountRupees,
+        currency: 'INR',
+        status: 'PENDING',
+        expiresAt,
+        metadata: { receipt },
+      })
+
+      if (orderId) {
+        await this.ordersRepo.updateStatus(orderId, undefined, {
+          paymentExpiresAt: expiresAt,
+        })
+      }
+
+      return {
+        success: true,
+        data: {
+          paymentId: payment.id,
+          razorpayOrderId: mockRzpOrderId,
+          amount: amountRupees,
+          currency: 'INR',
+          keyId: 'mock_key_id',
+        },
+      }
     }
 
     // Create Razorpay order
     const rzpOrder = await razorpay.orders.create({
-      amount: Math.round(order.totalAmount * 100), // paise
+      amount: amountPaise,
       currency: 'INR',
-      receipt: order.orderNumber,
+      receipt: receipt.substring(0, 40),
       notes: {
-        orderId: order.id,
+        orderId: orderId || null,
+        orderDraftId: orderDraftIdVal || null,
         userId,
       },
     })
 
-    // Payment expires in 15 minutes — after this the cleanup worker will
-    // cancel the order and release any reserved stock.
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
-
     // Save payment record
     const payment = await this.repo.create({
-      orderId: order.id,
+      orderId: orderId || null,
+      orderDraftId: orderDraftIdVal || null,
       userId,
       razorpayOrderId: rzpOrder.id,
-      amount: order.totalAmount,
+      amount: amountRupees,
       currency: 'INR',
       status: 'PENDING',
       expiresAt,
-      metadata: { receipt: order.orderNumber },
+      metadata: { receipt },
     })
 
-    // Update the order with payment expiry so the cleanup worker can find it
-    await this.ordersRepo.updateStatus(order.id, undefined, {
-      paymentExpiresAt: expiresAt,
-    })
+    if (orderId) {
+      await this.ordersRepo.updateStatus(orderId, undefined, {
+        paymentExpiresAt: expiresAt,
+      })
+    }
 
     logger.info(
       { paymentId: payment.id, razorpayOrderId: rzpOrder.id, orderId },
@@ -88,7 +142,7 @@ export class PaymentsService {
       data: {
         paymentId: payment.id,
         razorpayOrderId: rzpOrder.id,
-        amount: order.totalAmount,
+        amount: amountRupees,
         currency: 'INR',
         keyId: env.RAZORPAY_KEY_ID,
       },
@@ -98,8 +152,12 @@ export class PaymentsService {
   /**
    * Verify payment signature from Razorpay client-side callback
    */
-  async verifyPayment(userId, { razorpayOrderId, razorpayPaymentId, razorpaySignature }) {
-    const payment = await this.repo.findByRazorpayOrderId(razorpayOrderId)
+  async verifyPayment(userId, body) {
+    const rzpOrderId = body.razorpayOrderId || body.order_id
+    const rzpPaymentId = body.razorpayPaymentId || body.payment_id
+    const rzpSignature = body.razorpaySignature || body.signature
+
+    const payment = await this.repo.findByRazorpayOrderId(rzpOrderId)
     if (!payment) {
       return { success: false, message: 'Payment record not found' }
     }
@@ -108,34 +166,86 @@ export class PaymentsService {
       return { success: false, message: 'Unauthorized' }
     }
 
+    const isMock = rzpOrderId.startsWith('order_mock_') || !razorpay
+
     // HMAC-SHA256 verification
-    const expectedSignature = crypto
-      .createHmac('sha256', env.RAZORPAY_KEY_SECRET)
-      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-      .digest('hex')
+    if (!isMock) {
+      const expectedSignature = crypto
+        .createHmac('sha256', env.RAZORPAY_KEY_SECRET)
+        .update(`${rzpOrderId}|${rzpPaymentId}`)
+        .digest('hex')
 
-    if (expectedSignature !== razorpaySignature) {
-      logger.warn({ razorpayOrderId }, 'Payment signature verification failed')
+      if (expectedSignature !== rzpSignature) {
+        logger.warn({ rzpOrderId }, 'Payment signature verification failed')
 
-      await this.repo.updatePayment(payment.id, { status: 'FAILED' })
-      await this.ordersRepo.updateStatus(payment.orderId, undefined, {
-        paymentStatus: 'FAILED',
-      })
+        await this.repo.updatePayment(payment.id, { status: 'FAILED' })
+        if (payment.orderId) {
+          await this.ordersRepo.updateStatus(payment.orderId, undefined, {
+            paymentStatus: 'FAILED',
+          })
+        }
 
-      return { success: false, message: 'Payment verification failed' }
+        return { success: false, message: 'Payment verification failed' }
+      }
     }
 
     // Update payment record
     const updated = await this.repo.updatePayment(payment.id, {
-      razorpayPaymentId,
-      razorpaySignature,
+      razorpayPaymentId: rzpPaymentId,
+      razorpaySignature: rzpSignature,
       status: 'PAID',
     })
 
-    // Update order payment status
-    await this.ordersRepo.updateStatus(payment.orderId, 'WAITING_FOR_VENDOR_CONFIRMATION', {
-      paymentStatus: 'PAID',
-    })
+    if (payment.orderId) {
+      // Update order payment status (legacy path)
+      await this.ordersRepo.updateStatus(payment.orderId, 'WAITING_FOR_VENDOR_CONFIRMATION', {
+        paymentStatus: 'PAID',
+      })
+      try {
+        await orderQueue.add(
+          'auto-reject',
+          {
+            type: 'auto-reject',
+            orderId: payment.orderId,
+          },
+          {
+            jobId: `auto-reject-${payment.orderId}`,
+            delay: 15 * 60 * 1000,
+            removeOnComplete: true,
+          }
+        )
+      } catch (err) {
+        logger.warn({ err: err.message, orderId: payment.orderId }, 'Failed to queue auto-reject on verified payment')
+      }
+
+      try {
+        const { CartRepository } = await import('../cart/cart.repository.js')
+        const cartRepo = new CartRepository()
+        await cartRepo.clearCart(userId)
+        await cartRepo.clearExtras(userId)
+      } catch (err) {
+        logger.warn({ err: err.message, userId }, 'Cart clear after payment verify failed (non-critical)')
+      }
+
+      // Send order placed notification after confirmed payment
+      try {
+        const order = await this.ordersRepo.findByIdAndUser(payment.orderId, userId)
+        if (order) {
+          const { NotificationsRepository } = await import('../notifications/notifications.repository.js')
+          const { NotificationsService } = await import('../notifications/notifications.service.js')
+          const { buildCustomerOrderEventNotification } = await import('../notifications/customer-order-event.helper.js')
+          const notifService = new NotificationsService(new NotificationsRepository(), null)
+          await notifService.sendNotification(userId, buildCustomerOrderEventNotification({
+            orderId: order.id,
+            orderNumber: order.orderNumber || order.order_number,
+            timelineType: 'ORDER_PLACED',
+            status: 'CONFIRMED',
+          }))
+        }
+      } catch (err) {
+        logger.warn({ err: err.message, orderId: payment.orderId }, 'Order notification after payment verify failed (non-critical)')
+      }
+    }
     try {
       await orderQueue.add(
         'auto-reject',

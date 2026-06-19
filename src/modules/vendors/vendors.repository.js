@@ -244,4 +244,13 @@ export class VendorsRepository {
     )
     return rows[0] || null
   }
+
+  async hasActiveService(vendorId) {
+    const { rows } = await query(
+      'SELECT 1 FROM vendor_services WHERE vendor_id = $1 AND is_active = true LIMIT 1',
+      [vendorId]
+    )
+    return rows.length > 0
+  }
 }
+

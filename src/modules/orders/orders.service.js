@@ -1,5 +1,6 @@
 import { getClient } from '../../config/database.js'
 import { query } from '../../config/database.js'
+import { redis } from '../../config/redis.js'
 import { orderQueue } from '../../config/bullmq.js'
 import { logger } from '../../config/logger.js'
 import { getOffsetLimit, buildPagination } from '../../utils/paginate.js'
@@ -995,6 +996,251 @@ export class OrdersService {
         },
         'Customer order notification failed'
       )
+    }
+  }
+
+  async prepareOrder(userId, body) {
+    const quoteId = body.quoteId || body.quote_id
+    const addressId = body.addressId || body.address_id
+    const slotId = body.slotId || body.slot_id
+    // 1. Fetch quote from Redis
+    const quoteData = await redis.get(`quote:${quoteId}`)
+    if (!quoteData) {
+      return { success: false, message: 'Quotation not found or expired', code: 'QUOTE_EXPIRED' }
+    }
+    const quote = JSON.parse(quoteData)
+
+    // 2. Fetch address
+    const address = await this.addressRepo.findByIdAndUser(addressId, userId)
+    if (!address) {
+      return { success: false, message: 'Delivery address not found', code: 'ADDRESS_NOT_FOUND' }
+    }
+
+    // 3. Verify vendor status & delivery radius eligibility (Haversine check)
+    const vendorRes = await query(
+      `SELECT id, is_active, status, lat, lng, delivery_radius_km
+       FROM vendors
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [quote.vendor_id]
+    )
+    const vendor = vendorRes.rows[0]
+    if (!vendor || !vendor.is_active || vendor.status !== 'APPROVED') {
+      return { success: false, message: 'Vendor is not available for service', code: 'VENDOR_UNAVAILABLE' }
+    }
+
+    // Check Haversine distance
+    const EARTH_RADIUS_KM = 6371
+    const { rows: distRows } = await query(
+      `SELECT (${EARTH_RADIUS_KM} * acos(
+         LEAST(1.0, GREATEST(-1.0,
+           cos(radians($1::float8)) * cos(radians($2::float8))
+             * cos(radians($3::float8) - radians($4::float8))
+             + sin(radians($1::float8)) * sin(radians($2::float8))
+         ))
+       ))::numeric(7,2) AS distance_km`,
+      [Number(address.lat), Number(vendor.lat), Number(address.lng), Number(vendor.lng)]
+    )
+    const distance = parseFloat(distRows[0]?.distance_km || 0)
+    if (distance > parseFloat(vendor.delivery_radius_km)) {
+      return { success: false, message: 'Address falls outside this vendor\'s service area', code: 'OUT_OF_RADIUS' }
+    }
+
+    // 4. Verify slot hold
+    const holdRes = await query(
+      `SELECT booking_date FROM slot_holds
+       WHERE user_id = $1 AND slot_id = $2 AND vendor_id = $3 AND expires_at > NOW()
+       LIMIT 1`,
+      [userId, slotId, quote.vendor_id]
+    )
+    if (holdRes.rows.length === 0) {
+      return { success: false, message: 'No active slot hold found. Please hold a pickup slot before checkout.', code: 'NO_SLOT_HOLD' }
+    }
+    const bookingDate = holdRes.rows[0].booking_date
+
+    // 5. Calculations
+    const subtotal = quote.estimate_paise
+    const deliveryFee = 2900 // 29 INR in paise
+    const platformFee = 500  // 5 INR in paise
+    const payableAmount = subtotal + deliveryFee + platformFee
+
+    const snapshot = {
+      quote,
+      address,
+      slot_id: slotId,
+      booking_date: bookingDate,
+      fee_breakdown: {
+        subtotal_paise: subtotal,
+        delivery_fee_paise: deliveryFee,
+        platform_fee_paise: platformFee
+      }
+    }
+
+    // 6. Write draft
+    const { rows: draftRows } = await query(
+      `INSERT INTO order_drafts (user_id, vendor_id, slot_id, address_id, garment_lines, estimated_weight, payable_amount_paise, snapshot)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [
+        userId,
+        quote.vendor_id,
+        slotId,
+        addressId,
+        JSON.stringify(quote.garment_lines),
+        quote.estimated_weight_kg ? Number(quote.estimated_weight_kg) : null,
+        payableAmount,
+        JSON.stringify(snapshot)
+      ]
+    )
+
+    return {
+      success: true,
+      data: {
+        order_draft_id: draftRows[0].id,
+        payable_amount_paise: payableAmount,
+        snapshot
+      }
+    }
+  }
+
+  async placeOrderFromDraft(userId, { orderDraftId }) {
+    const draftRes = await query('SELECT * FROM order_drafts WHERE id = $1 AND user_id = $2', [orderDraftId, userId])
+    const draft = draftRes.rows[0]
+    if (!draft) {
+      return { success: false, message: 'Order draft not found', code: 'DRAFT_NOT_FOUND' }
+    }
+
+    // Verify payment is verified (PAID)
+    const paymentRes = await query('SELECT * FROM payments WHERE order_draft_id = $1 AND status = \'PAID\' LIMIT 1', [orderDraftId])
+    const payment = paymentRes.rows[0]
+    if (!payment) {
+      return { success: false, message: 'Payment not verified. Please complete payment first.', code: 'PAYMENT_PENDING' }
+    }
+
+    const snapshot = draft.snapshot
+    const client = await getClient()
+
+    try {
+      await client.query('BEGIN')
+
+      // Generate order number LNDR-YYYYMMDD-XXX
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      const pattern = `LNDR-${today}-%`
+      const seqRes = await client.query(`SELECT COUNT(*) FROM orders WHERE order_number LIKE $1`, [pattern])
+      const seq = parseInt(seqRes.rows[0].count, 10) + 1
+      const orderNumber = `LNDR-${today}-${String(seq).padStart(3, '0')}`
+
+      const subtotalRupees = (draft.payable_amount_paise - 2900 - 500) / 100
+      const deliveryFeeRupees = 29.00
+      const platformFeeRupees = 5.00
+      const totalRupees = draft.payable_amount_paise / 100
+
+      const orderInsertRes = await client.query(
+        `INSERT INTO orders (
+           order_number, user_id, vendor_id, status, items, subtotal, discount_amount,
+           delivery_fee, platform_fee, tax_amount, total_amount,
+           payment_method, payment_status, delivery_address,
+           vendor_slot_id, pickup_date,
+           estimated_amount_paise, payable_amount_paise,
+           fee_breakdown
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+         RETURNING id, order_number, user_id, vendor_id, status, created_at`,
+        [
+          orderNumber,
+          userId,
+          draft.vendor_id,
+          'WAITING_VENDOR_CONFIRMATION',
+          JSON.stringify(draft.garment_lines),
+          subtotalRupees,
+          0,
+          deliveryFeeRupees,
+          platformFeeRupees,
+          0,
+          totalRupees,
+          'ONLINE',
+          'PAID',
+          JSON.stringify(snapshot.address),
+          draft.slot_id,
+          snapshot.booking_date,
+          draft.payable_amount_paise - 2900 - 500,
+          draft.payable_amount_paise,
+          JSON.stringify(snapshot.fee_breakdown)
+        ]
+      )
+      const order = orderInsertRes.rows[0]
+
+      // Insert garment lines
+      for (const line of draft.garment_lines) {
+        await client.query(
+          `INSERT INTO order_items (order_id, garment_rate_id, name, price, quantity, unit, total, vendor_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            order.id,
+            line.garment_type_id,
+            line.name,
+            line.rate_paise / 100,
+            line.quantity,
+            line.unit,
+            line.total_paise / 100,
+            draft.vendor_id
+          ]
+        )
+
+        await client.query(
+          `INSERT INTO order_garment_lines (order_id, garment_rate_id, quantity, rate_paise, total_paise)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            order.id,
+            line.garment_type_id,
+            line.quantity,
+            line.rate_paise,
+            line.total_paise
+          ]
+        )
+      }
+
+      // Record Order Event
+      const { recordOrderEvent } = await import('../../utils/state-machine.js')
+      await recordOrderEvent(client, {
+        orderId: order.id,
+        oldStatus: null,
+        newStatus: 'WAITING_VENDOR_CONFIRMATION',
+        actorId: userId,
+        actorRole: 'CUSTOMER',
+        note: 'Order placed from draft'
+      })
+
+      // Link payment to real order
+      await client.query('UPDATE payments SET order_id = $1 WHERE id = $2', [order.id, payment.id])
+
+      // Delete the slot hold
+      await client.query('DELETE FROM slot_holds WHERE user_id = $1 AND slot_id = $2 AND vendor_id = $3', [userId, draft.slot_id, draft.vendor_id])
+
+      await client.query('COMMIT')
+
+      // Notify vendor
+      try {
+        if (this.fastify?.io) {
+          this.fastify.io.to(`shop:${draft.vendor_id}`).emit('order.created', {
+            order_id: order.id,
+            status: 'WAITING_VENDOR_CONFIRMATION',
+            order_number: orderNumber
+          })
+        }
+      } catch (err) {
+        logger.warn({ err: err.message, orderId: order.id }, 'Realtime notification failed')
+      }
+
+      return {
+        success: true,
+        order,
+        status: 'WAITING_VENDOR_CONFIRMATION'
+      }
+    } catch (err) {
+      await client.query('ROLLBACK')
+      logger.error({ err: err.message, draftId: orderDraftId }, 'Order draft checkout failed')
+      throw err
+    } finally {
+      client.release()
     }
   }
 }

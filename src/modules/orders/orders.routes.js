@@ -11,11 +11,13 @@ import {
   adminListOrdersSchema,
   adminUpdateStatusSchema,
   adminAssignRiderSchema,
+  prepareOrderSchema,
 } from './orders.schema.js'
 
 /**
  * Orders routes plugin
  * Prefix: /api/v1/orders
+ * All routes require authentication
  */
 export default async function ordersRoutes(fastify) {
   const repository = new OrdersRepository()
@@ -24,11 +26,22 @@ export default async function ordersRoutes(fastify) {
 
   // ─── Customer routes (AUTH) ─────────────────────────────
 
-  // POST / — Place a new order
+  // POST /prepare — Prepare a new order draft before payment
+  fastify.post('/prepare', {
+    schema: prepareOrderSchema,
+    preHandler: [fastify.authenticate],
+  }, controller.prepare.bind(controller))
+
+  // POST / — Place a new order (supports legacy cart or new LNDRY draft checkout)
   fastify.post('/', {
     schema: placeOrderSchema,
     preHandler: [fastify.authenticate],
-  }, controller.placeOrder.bind(controller))
+  }, async (request, reply) => {
+    if (request.body?.order_draft_id || request.body?.orderDraftId) {
+      return controller.placeOrderFromDraft(request, reply)
+    }
+    return controller.placeOrder(request, reply)
+  })
 
   // GET / — List user orders
   fastify.get('/', {

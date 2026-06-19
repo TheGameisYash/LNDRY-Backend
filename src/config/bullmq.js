@@ -193,7 +193,28 @@ export const reportPrecomputeQueue = new Queue('report-precompute', {
   },
 })
 
+export const vendorAutoRejectQueue = new Queue('vendor-auto-reject', {
+  connection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    removeOnComplete: { age: 24 * 3600 },
+    removeOnFail: { age: 7 * 24 * 3600 },
+  },
+})
+
+export const slotHoldExpiryQueue = new Queue('slot-hold-expiry', {
+  connection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 5000 },
+    removeOnComplete: { age: 24 * 3600 },
+    removeOnFail: { age: 7 * 24 * 3600 },
+  },
+})
+
 // ─── WORKERS ─────────────────────────────────────────────
+
 
 const workers = []
 
@@ -498,6 +519,26 @@ export function startReportPrecomputeWorker(processor) {
   return worker
 }
 
+export function startVendorAutoRejectWorker(processor) {
+  const worker = new Worker('vendor-auto-reject', processor, {
+    connection,
+    concurrency: 5,
+  })
+  workers.push(worker)
+  logger.info('Vendor auto-reject worker started')
+  return worker
+}
+
+export function startSlotHoldExpiryWorker(processor) {
+  const worker = new Worker('slot-hold-expiry', processor, {
+    connection,
+    concurrency: 1,
+  })
+  workers.push(worker)
+  logger.info('Slot-hold-expiry worker started')
+  return worker
+}
+
 /**
  * Close all queues and workers (graceful shutdown)
  */
@@ -515,5 +556,8 @@ export async function closeBullMQ() {
   await payoutQueue.close()
   await stockNotificationsQueue.close()
   await reportPrecomputeQueue.close()
+  await vendorAutoRejectQueue.close()
+  await slotHoldExpiryQueue.close()
   logger.info('BullMQ queues and workers closed')
 }
+

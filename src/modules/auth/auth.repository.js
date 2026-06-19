@@ -199,4 +199,72 @@ export class AuthRepository {
     )
     return rows[0] || null
   }
+
+  /**
+   * Create an OTP challenge
+   */
+  async createOtpChallenge({ phone, otpHash, accountType, expiresAt }) {
+    const { rows } = await query(
+      `INSERT INTO otp_challenges (phone, otp_hash, account_type, expires_at)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, expires_at`,
+      [phone, otpHash, accountType, expiresAt]
+    )
+    return rows[0]
+  }
+
+  /**
+   * Get an OTP challenge
+   */
+  async getOtpChallenge(challengeId, phone) {
+    const { rows } = await query(
+      `SELECT id, phone, otp_hash, account_type, expires_at, attempts, created_at
+       FROM otp_challenges WHERE id = $1 AND phone = $2`,
+      [challengeId, phone]
+    )
+    return rows[0] || null
+  }
+
+  /**
+   * Increment attempts on an OTP challenge
+   */
+  async incrementOtpChallengeAttempts(challengeId) {
+    const { rows } = await query(
+      `UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = $1 RETURNING attempts`,
+      [challengeId]
+    )
+    return rows[0]?.attempts || 0
+  }
+
+  /**
+   * Delete an OTP challenge
+   */
+  async deleteOtpChallenge(challengeId) {
+    await query(`DELETE FROM otp_challenges WHERE id = $1`, [challengeId])
+  }
+
+  /**
+   * Register a user's device
+   */
+  async registerDevice({ userId, deviceId, platform, fcmToken, appVersion }) {
+    const { rows } = await query(
+      `INSERT INTO devices (user_id, device_id, platform, fcm_token, app_version, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (user_id, device_id) 
+       DO UPDATE SET platform = $3, fcm_token = $4, app_version = $5, updated_at = NOW()
+       RETURNING id`,
+      [userId, deviceId, platform, fcmToken, appVersion]
+    )
+    return rows[0]
+  }
+
+  /**
+   * Delete a registered device
+   */
+  async deleteDevice(userId, deviceId) {
+    await query(
+      `DELETE FROM devices WHERE user_id = $1 AND device_id = $2`,
+      [userId, deviceId]
+    )
+  }
 }

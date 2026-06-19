@@ -230,6 +230,27 @@ export class AddressesService {
   }
 
   /**
+   * Get address by ID
+   */
+  async get(userId, id) {
+    return this.repo.findByIdAndUser(id, userId)
+  }
+
+  /**
+   * Validate coordinates to check serviceability and eligible vendor count
+   */
+  async validateLocation(lat, lng) {
+    if (!this._hasValidCoordinates(lat, lng)) {
+      return { serviceable: false, eligible_vendor_count: 0 }
+    }
+    const count = await this.repo.countServiceableVendorsAtCoords(lat, lng)
+    return {
+      serviceable: count > 0,
+      eligible_vendor_count: count
+    }
+  }
+
+  /**
    * Validate pincode for delivery availability.
    * Checks against pincodes in active vendors' serviceable_pincodes arrays.
    * Returns available=true also when no vendors are configured yet (null set).

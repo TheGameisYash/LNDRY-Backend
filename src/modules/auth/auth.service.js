@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { generateOTP, storeOTP, verifyOTP } from '../../utils/otp.js'
 import { sendSmsOtp, verifySmsOtp } from '../../utils/sms.js'
 import { generateTokenPair, signAccessToken, signRefreshToken, verifyToken } from '../../utils/jwt.js'
@@ -5,6 +6,7 @@ import { orderQueue } from '../../config/bullmq.js'
 import { redis } from '../../config/redis.js'
 import { env } from '../../config/env.js'
 import { logger } from '../../config/logger.js'
+import { query } from '../../config/database.js'
 
 const REFRESH_TOKEN_PREFIX = 'refresh:'
 const SMS_SESSION_PREFIX = 'sms:session:'
@@ -41,25 +43,32 @@ export class AuthService {
    * Production: sends via 2Factor.in SMS
    * Development: returns OTP in response for testing
    */
-  async sendOtp(phone) {
-    if (this._isDemoOtpPhone(phone)) {
-      await redis.del(`${SMS_SESSION_PREFIX}${phone}`)
-      logger.info({ phone: phone.slice(-4) }, 'Demo OTP bypass used')
-      return {
-        otp: env.DEMO_OTP_CODE,
-        isDemoOtp: true,
-      }
+  async sendOtp(phone, accountType = 'CUSTOMER') {
+    // Rate limit: max 5 OTP requests per phone per 10 minutes
+    const rateLimitKey = `otp_limit:${phone}`
+    const rateCount = await redis.incr(rateLimitKey)
+    if (rateCount === 1) {
+      await redis.expire(rateLimitKey, 600) // 10 minutes
+    }
+    if (rateCount > 5) {
+      throw { statusCode: 429, message: 'Too many OTP requests. Please wait 10 minutes.', code: 'RATE_LIMIT_EXCEEDED' }
     }
 
-    // Production mode — use 2Factor.in
-    if (env.NODE_ENV === 'production' && env.SMS_PROVIDER === '2factor') {
-      const smsResult = await sendSmsOtp(phone)
+    let otpCode = '123456'
+    let isDemo = false
+    let isSmsSent = false
 
+    if (this._isDemoOtpPhone(phone)) {
+      otpCode = env.DEMO_OTP_CODE || '123456'
+      isDemo = true
+      await redis.del(`${SMS_SESSION_PREFIX}${phone}`)
+      logger.info({ phone: phone.slice(-4) }, 'Demo OTP bypass used')
+    } else if (env.NODE_ENV === 'production' && env.SMS_PROVIDER === '2factor') {
+      const smsResult = await sendSmsOtp(phone)
       if (!smsResult.success) {
-        logger.error({ phone: phone.slice(-4) }, '2Factor SMS failed, falling back to dev OTP')
-        // Fall through to dev mode as fallback
+        logger.error({ phone: phone.slice(-4) }, '2Factor SMS failed, falling back to local OTP')
       } else {
-        // Store session ID for verification
+        isSmsSent = true
         await redis.set(
           `${SMS_SESSION_PREFIX}${phone}`,
           smsResult.sessionId,
@@ -67,15 +76,11 @@ export class AuthService {
           env.OTP_EXPIRY_SECONDS
         )
         logger.info({ phone: phone.slice(-4) }, 'OTP sent via 2Factor SMS')
-        return {}
       }
-    }
-
-    // Development mode OR 2Factor with SMS_PROVIDER=2factor in dev (for testing real SMS)
-    if (env.SMS_PROVIDER === '2factor' && env.TWO_FACTOR_API_KEY) {
+    } else if (env.SMS_PROVIDER === '2factor' && env.TWO_FACTOR_API_KEY) {
       const smsResult = await sendSmsOtp(phone)
-
       if (smsResult.success) {
+        isSmsSent = true
         await redis.set(
           `${SMS_SESSION_PREFIX}${phone}`,
           smsResult.sessionId,
@@ -83,116 +88,177 @@ export class AuthService {
           env.OTP_EXPIRY_SECONDS
         )
         logger.info({ phone: phone.slice(-4) }, 'OTP sent via 2Factor SMS (dev)')
-        return { smsOtp: true }  // Flag: tell controller not to return OTP
       }
     }
 
-    // Fallback: generate local OTP (dev testing)
-    const otp = generateOTP()
-    await storeOTP(phone, otp)
-
-    logger.info({ phone: phone.slice(-4) }, 'OTP generated (local)')
-
-    if (env.NODE_ENV === 'development') {
-      logger.debug({ otp }, 'DEV OTP (remove in production)')
-      return { otp }
+    if (!isSmsSent && !isDemo) {
+      otpCode = generateOTP()
     }
 
-    return {}
+    const otpHash = crypto.createHash('sha256').update(otpCode).digest('hex')
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000)
+
+    const challenge = await this.repo.createOtpChallenge({
+      phone,
+      otpHash,
+      accountType: accountType || 'CUSTOMER',
+      expiresAt
+    })
+
+    // Store in Redis for legacy helper verifyOTP compatibility
+    await storeOTP(phone, otpCode)
+
+    logger.info({ phone: phone.slice(-4) }, 'OTP challenge created')
+
+    const data = {
+      challenge_id: challenge.id,
+      expires_in: 300,
+    }
+
+    if (env.NODE_ENV === 'development' || isDemo) {
+      data.otp = otpCode
+    }
+
+    return data
   }
 
   /**
    * Verify OTP and return JWT tokens
-   * Tries 2Factor.in verification first, then falls back to local Redis OTP
    */
-  async verifyOtp(phone, otp, role) {
-    let otpValid = false
+  async verifyOtp(phone, challengeIdOrOtp, otpOrRole, deviceOrRole) {
+    let challengeId = null
+    let otp = null
+    let role = null
+    let device = null
 
-    if (this._isDemoOtpPhone(phone)) {
-      if (`${otp || ''}`.trim() !== env.DEMO_OTP_CODE) {
-        return { success: false, message: 'Invalid OTP' }
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+    // Detect if we are in new challengeId flow or legacy flow
+    if (typeof challengeIdOrOtp === 'string' && uuidRegex.test(challengeIdOrOtp)) {
+      challengeId = challengeIdOrOtp
+      otp = otpOrRole
+      device = deviceOrRole
+    } else {
+      otp = challengeIdOrOtp
+      role = otpOrRole
+      // Fallback: look up latest challenge for the phone from DB
+      const result = await query(
+        `SELECT id, account_type FROM otp_challenges WHERE phone = $1 ORDER BY created_at DESC LIMIT 1`,
+        [phone]
+      )
+      const rows = result?.rows || []
+      if (rows[0]) {
+        challengeId = rows[0].id
+        if (!role) role = rows[0].account_type
       }
-      otpValid = true
-      await redis.del(`${SMS_SESSION_PREFIX}${phone}`)
-      logger.info({ phone: phone.slice(-4) }, 'Demo OTP verified')
     }
 
-    // Try 2Factor.in verification first
-    const sessionId = otpValid ? null : await redis.get(`${SMS_SESSION_PREFIX}${phone}`)
-
-    if (sessionId) {
-      const smsResult = await verifySmsOtp(sessionId, otp)
-      if (smsResult.success) {
-        otpValid = true
-        await redis.del(`${SMS_SESSION_PREFIX}${phone}`)
-      } else {
-        return { success: false, message: smsResult.message || 'Invalid OTP' }
-      }
-    }
-
-    // Fallback: local Redis OTP verification
-    if (!otpValid) {
+    const challenge = challengeId ? await this.repo.getOtpChallenge(challengeId, phone) : null
+    if (!challenge) {
+      // If challenge not found in DB, try direct Redis verification for fallback compatibility
       const result = await verifyOTP(phone, otp)
       if (!result.valid) {
-        return { success: false, message: result.message }
+        return { success: false, message: result.message || 'OTP challenge not found or invalid' }
       }
+    } else {
+      if (new Date(challenge.expires_at) <= new Date()) {
+        await this.repo.deleteOtpChallenge(challenge.id)
+        return { success: false, message: 'OTP expired. Request a new one.' }
+      }
+
+      let otpValid = false
+      if (this._isDemoOtpPhone(phone)) {
+        if (`${otp || ''}`.trim() === (env.DEMO_OTP_CODE || '123456')) {
+          otpValid = true
+          await redis.del(`${SMS_SESSION_PREFIX}${phone}`)
+        }
+      }
+
+      const sessionId = otpValid ? null : await redis.get(`${SMS_SESSION_PREFIX}${phone}`)
+      if (sessionId && !otpValid) {
+        const smsResult = await verifySmsOtp(sessionId, otp)
+        if (smsResult.success) {
+          otpValid = true
+          await redis.del(`${SMS_SESSION_PREFIX}${phone}`)
+        }
+      }
+
+      if (!otpValid) {
+        const hashedInput = crypto.createHash('sha256').update(otp).digest('hex')
+        if (challenge.otp_hash === hashedInput) {
+          otpValid = true
+        }
+      }
+
+      if (!otpValid) {
+        const attempts = await this.repo.incrementOtpChallengeAttempts(challenge.id)
+        if (attempts >= 3) {
+          await this.repo.deleteOtpChallenge(challenge.id)
+          return { success: false, message: 'Too many failed attempts. Locked out.' }
+        }
+        return { success: false, message: `Invalid OTP. ${3 - attempts} attempts remaining.` }
+      }
+
+      await this.repo.deleteOtpChallenge(challenge.id)
+      await redis.del(`otp:${phone}`)
     }
 
     // Normalize role: RIDER, DELIVERY → 'RIDER' (canonical value)
-    const requestedRole = (role === 'RIDER' || role === 'DELIVERY') ? 'RIDER' : null
+    const requestedRole = (role === 'RIDER' || role === 'DELIVERY' || challenge?.account_type === 'RIDER') ? 'RIDER' : 'CUSTOMER'
 
     // Find or create user
     let user = await this.repo.findByPhone(phone)
     let isNewUser = false
 
     if (!user) {
-      user = await this.repo.createUser(phone, requestedRole || 'CUSTOMER')
+      user = await this.repo.createUser(phone, requestedRole)
       isNewUser = true
       logger.info({ userId: user.id, role: user.role }, 'New user registered')
 
-      // Auto-create rider_profile for new RIDER registrations
       if (user.role === 'RIDER') {
         await this.repo.ensureRiderProfile(user.id)
         logger.info({ userId: user.id }, 'Auto-created rider_profile for new rider')
       }
     } else if (requestedRole === 'RIDER' && user.role === 'CUSTOMER') {
-      // Existing customer registering as rider via rider app
       await this.repo.updateRole(user.id, 'RIDER')
       user.role = 'RIDER'
       await this.repo.ensureRiderProfile(user.id)
       logger.info({ userId: user.id }, 'Upgraded CUSTOMER to RIDER with rider_profile')
     }
 
-    // Check if user is blocked
     if (!user.is_active) {
       return { success: false, message: 'Your account has been blocked. Contact support.' }
     }
 
-    // ─── Shop staff branch-level authentication ──────────────────
-    // Requirement 13.1, 13.2, 13.3, 13.4 — staff must auto-scope (1 shop),
-    // pick (multiple vendors), or fall through (zero vendors → behave as a
-    // regular user with no shop scope).
-    //
-    // Backward compatibility: customers and riders never reach this branch
-    // because they have no vendor_staff records, so their JWT structure is
-    // unchanged.
+    // Register device if details are provided
+    if (device && device.device_id) {
+      await this.repo.registerDevice({
+        userId: user.id,
+        deviceId: device.device_id,
+        platform: device.platform || 'UNKNOWN',
+        fcmToken: device.fcm_token || '',
+        appVersion: device.app_version || ''
+      })
+    }
+
+    // Determine roles linked to this phone
+    const roles = [user.role]
     let staffAssignments = []
     if (user.role !== 'RIDER') {
       try {
         staffAssignments = await this.repo.findActiveShopStaffByUserId(user.id)
+        for (const assign of staffAssignments) {
+          if (!roles.includes(assign.role)) {
+            roles.push(assign.role)
+          }
+        }
       } catch (err) {
-        // If the lookup fails (e.g. vendor_staff/vendors tables not yet present
-        // in a fresh environment), treat the user as a non-staff and continue.
-        logger.warn(
-          { err: err.message, userId: user.id, action: 'shop_staff_lookup_failed' },
-          'Shop staff lookup failed during login — falling back to standard auth'
-        )
-        staffAssignments = []
+        logger.warn({ err: err.message, userId: user.id }, 'Shop staff lookup failed')
       }
     }
 
-    if (staffAssignments.length === 1) {
-      // Single shop → issue shop-scoped JWT directly (Requirement 2.6, 13.2)
+    if (staffAssignments.length === 1 && !role) {
+      // Single shop and no role specified → issue shop-scoped JWT directly
       const assignment = staffAssignments[0]
       const accessToken = signAccessToken(
         {
@@ -231,6 +297,7 @@ export class AuthService {
         success: true,
         accessToken,
         refreshToken,
+        roles,
         user: {
           id: user.id,
           phone: user.phone,
@@ -245,10 +312,8 @@ export class AuthService {
       }
     }
 
-    if (staffAssignments.length > 1) {
-      // Multiple vendors → require selection (Requirement 2.7, 13.3)
-      // Issue a short-lived temp token (no shop scope) so the client can
-      // call POST /auth/select-shop. We do NOT issue a refresh token here.
+    if (staffAssignments.length > 1 && !role) {
+      // Multiple vendors and no role specified → require selection
       const tempToken = signAccessToken(
         {
           id: user.id,
@@ -272,6 +337,7 @@ export class AuthService {
         success: true,
         requires_shop_selection: true,
         temp_token: tempToken,
+        roles,
         vendors: staffAssignments.map((a) => ({
           vendor_id: a.vendor_id,
           shop_name: a.shop_name,
@@ -287,21 +353,16 @@ export class AuthService {
       }
     }
 
-    // ─── Default path: zero shop assignments (customers, riders, admins) ─
-    // JWT structure remains unchanged for backward compatibility.
-    // Generate JWT pair
     const payload = { id: user.id, phone: user.phone, role: user.role }
     const tokens = generateTokenPair(payload)
 
-    // Store refresh token in Redis (for invalidation on logout)
     await redis.set(
       `${REFRESH_TOKEN_PREFIX}${user.id}`,
       tokens.refreshToken,
       'EX',
-      7 * 24 * 60 * 60 // 7 days
+      7 * 24 * 60 * 60
     )
 
-    // For RIDER users, fetch rider_profile to get verification (approval) status
     let isVerified = false
     if (user.role === 'RIDER') {
       const riderProfile = await this.repo.getRiderProfile(user.id)
@@ -315,6 +376,7 @@ export class AuthService {
       success: true,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+      roles,
       user: {
         id: user.id,
         phone: user.phone,

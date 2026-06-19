@@ -12,15 +12,15 @@ const pool = new Pool({
 async function run() {
   try {
     const res = await pool.query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-      ORDER BY table_name
+      SELECT enumlabel 
+      FROM pg_enum 
+      JOIN pg_type ON pg_enum.enumtypid = pg_type.oid 
+      WHERE pg_type.typname = 'order_status'
     `);
-    console.log('\n--- TABLES ---');
-    console.log(res.rows.map(r => r.table_name));
-  } catch(e) {
-    console.error("DB Error:", e.message);
+    console.log('Enum values for order_status:');
+    console.log(res.rows.map(r => r.enumlabel));
+  } catch (e) {
+    console.error("Error:", e.message);
   } finally {
     await pool.end();
   }

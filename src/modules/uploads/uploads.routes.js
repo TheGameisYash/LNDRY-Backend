@@ -42,6 +42,16 @@ export default async function uploadsRoutes(fastify) {
     preHandler: [fastify.authenticate, fastify.authorize(['ADMIN'])],
   }, controller.uploadFile.bind(controller))
 
+  // POST /document — Upload private secure KYC document [VENDOR | ADMIN]
+  fastify.post('/document', {
+    schema: {
+      tags: ['Uploads'],
+      summary: 'Upload private secure KYC document',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: [fastify.authenticate],
+  }, controller.uploadDocumentPrivate.bind(controller))
+
   // GET /proxy — Proxy a Cloudinary file for mobile clients
   fastify.get('/proxy', {
     schema: {
@@ -74,4 +84,27 @@ export default async function uploadsRoutes(fastify) {
     },
     preHandler: [fastify.authenticate, fastify.authorize(['ADMIN'])],
   }, controller.deleteImage.bind(controller))
+
+  // DELETE /:assetId — Delete asset (Cloudinary image or private document) [AUTH]
+  fastify.delete('/:assetId', {
+    schema: {
+      tags: ['Uploads'],
+      summary: 'Delete uploaded asset (private document or Cloudinary image)',
+      params: {
+        type: 'object',
+        required: ['assetId'],
+        properties: {
+          assetId: { type: 'string' },
+        },
+      },
+      body: {
+        type: 'object',
+        properties: {
+          reason: { type: 'string' },
+        },
+      },
+    },
+    preHandler: [fastify.authenticate],
+  }, controller.deleteUpload.bind(controller))
 }
+

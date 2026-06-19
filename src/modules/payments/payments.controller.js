@@ -14,7 +14,7 @@ export class PaymentsController {
   async createPaymentOrder(request, reply) {
     const result = await this.service.createPaymentOrder(
       request.user.id,
-      request.body.orderId
+      request.body
     )
     if (!result.success) {
       return reply.code(400).send(error(result.message, 'PAYMENT_FAILED'))

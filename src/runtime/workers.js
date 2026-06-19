@@ -14,7 +14,10 @@ import {
   startScheduledOrderWorker,
   startStockNotificationsWorker,
   startReportPrecomputeWorker,
+  startVendorAutoRejectWorker,
+  startSlotHoldExpiryWorker,
 } from '../config/bullmq.js'
+
 
 export async function startWorkerRuntime() {
   const {
@@ -74,6 +77,14 @@ export async function startWorkerRuntime() {
   // Report-precompute worker (task 13.4) — runs slow report queries
   // (>100ms median) and caches results to Redis under deterministic keys.
   startReportPrecomputeWorker(createReportPrecomputeProcessor())
+
+  // LNDRY MVP workers
+  const { createVendorAutoRejectProcessor, createSlotHoldExpiryProcessor } = await import(
+    '../workers/lndry-jobs.worker.js'
+  )
+  startVendorAutoRejectWorker(createVendorAutoRejectProcessor())
+  startSlotHoldExpiryWorker(createSlotHoldExpiryProcessor())
+
 
   // Event-loop blocking detector (task 13.6) — logs warning when
   // the event loop is blocked for >100ms.

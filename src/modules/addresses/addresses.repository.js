@@ -1,5 +1,7 @@
 import { query, getClient } from '../../config/database.js'
 
+const EARTH_RADIUS_KM = 6371
+
 /**
  * Addresses repository — all SQL queries for delivery addresses
  */
@@ -146,6 +148,32 @@ export class AddressesRepository {
       [userId]
     )
     return rows[0].count
+  }
+
+  /**
+   * Count how many active, non-deleted vendors serve the given coords using Haversine formula
+   */
+  async countServiceableVendorsAtCoords(lat, lng) {
+    const { rows } = await query(
+      `SELECT COUNT(*)::int AS count
+       FROM (
+         SELECT s.id,
+                (${EARTH_RADIUS_KM} * acos(
+                  LEAST(1.0, GREATEST(-1.0,
+                    cos(radians($1::float8)) * cos(radians(s.lat::float8))
+                      * cos(radians(s.lng::float8) - radians($2::float8))
+                      + sin(radians($1::float8)) * sin(radians(s.lat::float8))
+                  ))
+                ))::numeric(7,2) AS distance_km,
+                s.delivery_radius_km
+           FROM vendors s
+          WHERE s.is_active = true
+            AND s.deleted_at IS NULL
+       ) candidates
+       WHERE distance_km <= delivery_radius_km`,
+      [lat, lng]
+    )
+    return rows[0]?.count || 0
   }
 
   /**

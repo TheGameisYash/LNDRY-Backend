@@ -1,8 +1,12 @@
 import http from 'node:http'
 import https from 'node:https'
+import fs from 'node:fs'
+import path from 'node:path'
+import crypto from 'node:crypto'
 
 import { success, error } from '../../utils/apiResponse.js'
 import { env } from '../../config/env.js'
+
 
 /**
  * Uploads controller
@@ -170,7 +174,119 @@ export class UploadsController {
 
     return reply.code(200).send(success(null, 'Image deleted'))
   }
+
+  async uploadDocumentPrivate(request, reply) {
+    const data = await request.file()
+    if (!data) {
+      return reply.code(400).send(error('No file provided'))
+    }
+
+    const documentType = data.fields.document_type?.value || 'owner_identity'
+
+    // Retrieve vendor profile for current user
+    const { query } = await import('../../config/database.js')
+    const { rows } = await query(
+      'SELECT id FROM vendors WHERE created_by = $1 LIMIT 1',
+      [request.user.id]
+    )
+
+    const vendor = rows[0]
+    if (!vendor) {
+      return reply.code(404).send(error('Vendor profile not found', 'NOT_FOUND'))
+    }
+
+    try {
+      const documentId = crypto.randomUUID()
+      const extension = path.extname(data.filename)
+      const filename = `${documentId}${extension}`
+      
+      const storageDir = path.join(process.cwd(), 'storage', 'documents')
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true })
+      }
+      
+      const filePath = path.join(storageDir, filename)
+      const writeStream = fs.createWriteStream(filePath)
+      
+      await new Promise((resolve, reject) => {
+        data.file.pipe(writeStream)
+        data.file.on('end', resolve)
+        data.file.on('error', reject)
+      })
+
+      const fileUrl = `private://documents/${filename}`
+      const docResult = await query(
+        `INSERT INTO vendor_documents (vendor_id, document_type, file_url)
+         VALUES ($1, $2, $3)
+         RETURNING id`,
+        [vendor.id, documentType, fileUrl]
+      )
+      
+      return reply.code(201).send(success({ document_id: docResult.rows[0].id }, 'Document uploaded successfully'))
+    } catch (err) {
+      request.log.error({ err }, 'Private document upload failed')
+      return reply.code(500).send(error(err.message || 'Upload failed'))
+    }
+  }
+
+  async deleteUpload(request, reply) {
+    const { assetId } = request.params
+    const { reason } = request.body || {}
+
+    // Check if assetId is a UUID (likely a private document)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assetId)
+
+    if (isUuid) {
+      const { query } = await import('../../config/database.js')
+      const { rows } = await query(
+        'SELECT id, vendor_id, file_url FROM vendor_documents WHERE id = $1',
+        [assetId]
+      )
+      const doc = rows[0]
+      if (!doc) {
+        return reply.code(404).send(error('Asset not found'))
+      }
+
+      // Check access: user must be ADMIN, or must be owner/staff of the vendor
+      const isAdmin = request.user.role === 'ADMIN'
+      if (!isAdmin) {
+        const vendorRows = await query(
+          'SELECT 1 FROM vendors WHERE id = $1 AND created_by = $2',
+          [doc.vendor_id, request.user.id]
+        )
+        if (vendorRows.rows.length === 0) {
+          return reply.code(403).send(error('Forbidden'))
+        }
+      }
+
+      // Perform deletion
+      await query('DELETE FROM vendor_documents WHERE id = $1', [assetId])
+      
+      // Attempt to delete physical local file if it's local
+      if (doc.file_url.startsWith('private://')) {
+        const filename = doc.file_url.replace('private://documents/', '')
+        const filePath = path.join(process.cwd(), 'storage', 'documents', filename)
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath)
+          }
+        } catch (err) {
+          request.log.warn({ err }, 'Failed to delete physical file from disk')
+        }
+      }
+
+      return reply.send(success(null, 'Private document deleted successfully'))
+    } else {
+      // Cloudinary image deletion
+      const result = await this.service.deleteImage(assetId)
+      if (!result.success) {
+        return reply.code(400).send(error('Failed to delete image'))
+      }
+      return reply.send(success(null, 'Image deleted successfully'))
+    }
+  }
 }
+
 
 function buildProxyCandidates(rawUrl) {
   const candidates = new Set([rawUrl])

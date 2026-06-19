@@ -53,6 +53,22 @@ export class AddressesController {
     return reply.code(200).send(success(result.address, 'Default address updated'))
   }
 
+  /** GET /:id */
+  async get(request, reply) {
+    const address = await this.service.get(request.user.id, request.params.id)
+    if (!address) {
+      return reply.code(404).send(error('Address not found', 'NOT_FOUND'))
+    }
+    return reply.code(200).send(success(address, 'Address fetched'))
+  }
+
+  /** POST /validate-location */
+  async validateLocation(request, reply) {
+    const { lat, lng } = request.body
+    const result = await this.service.validateLocation(lat, lng)
+    return reply.code(200).send(success(result, 'Location validation completed'))
+  }
+
   /** POST /validate-pincode */
   async validatePincode(request, reply) {
     const result = await this.service.validatePincode(request.body.pincode)

@@ -107,4 +107,19 @@ export default async function authRoutes(fastify) {
       },
     },
   }, controller.deleteAccount.bind(controller))
+
+  // GET /session — returns profile summary, permissions, onboarding state [AUTH]
+  fastify.get('/session', {
+    preHandler: [fastify.authenticate],
+  }, controller.session.bind(controller))
+
+  // GET /my-roles — lists all roles linked to this phone [AUTH]
+  fastify.get('/my-roles', {
+    preHandler: [fastify.authenticate],
+  }, controller.myRoles.bind(controller))
+
+  // POST /select-role — issue scoped JWT [AUTH]
+  fastify.post('/select-role', {
+    preHandler: [fastify.authenticate],
+  }, controller.selectRole.bind(controller))
 }

@@ -12,15 +12,13 @@ const pool = new Pool({
 async function run() {
   try {
     const res = await pool.query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-      ORDER BY table_name
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'reviews'
     `);
-    console.log('\n--- TABLES ---');
-    console.log(res.rows.map(r => r.table_name));
-  } catch(e) {
-    console.error("DB Error:", e.message);
+    console.table(res.rows);
+  } catch (e) {
+    console.error(e.message);
   } finally {
     await pool.end();
   }

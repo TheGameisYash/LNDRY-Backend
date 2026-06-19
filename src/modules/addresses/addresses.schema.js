@@ -147,3 +147,43 @@ export const validatePincodeSchema = {
     },
   },
 }
+
+export const getAddressSchema = {
+  tags: ['Addresses'],
+  summary: 'Get address by ID',
+  params: {
+    type: 'object',
+    required: ['id'],
+    properties: { id: { type: 'string', format: 'uuid' } },
+  },
+  response: { 200: addressResponse },
+}
+
+export const validateLocationSchema = {
+  tags: ['Addresses'],
+  summary: 'Validate address coordinates',
+  body: {
+    type: 'object',
+    required: ['lat', 'lng'],
+    properties: {
+      lat: { type: 'number', minimum: -90, maximum: 90 },
+      lng: { type: 'number', minimum: -180, maximum: 180 },
+    },
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        data: {
+          type: 'object',
+          properties: {
+            serviceable: { type: 'boolean' },
+            eligible_vendor_count: { type: 'integer' }
+          }
+        }
+      }
+    }
+  }
+}

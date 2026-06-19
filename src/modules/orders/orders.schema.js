@@ -105,32 +105,51 @@ export const placeOrderSchema = {
   tags: ['Orders'],
   summary: 'Place a new order from cart',
   body: {
-    type: 'object',
-    required: ['addressId', 'paymentMethod', 'vendorSlotId', 'pickupDate'],
-    properties: {
-      addressId: { type: 'string', format: 'uuid' },
-      paymentMethod: { type: 'string', enum: ['COD', 'ONLINE', 'WALLET'] },
-      vendorSlotId: { type: 'string', format: 'uuid' },
-      pickupDate: { type: 'string', format: 'date' },
-      couponCode: {
-        oneOf: [
-          { type: 'string', minLength: 1, maxLength: 50 },
-          { type: 'null' },
-        ],
+    oneOf: [
+      {
+        type: 'object',
+        required: ['addressId', 'paymentMethod', 'vendorSlotId', 'pickupDate'],
+        properties: {
+          addressId: { type: 'string', format: 'uuid' },
+          paymentMethod: { type: 'string', enum: ['COD', 'ONLINE', 'WALLET'] },
+          vendorSlotId: { type: 'string', format: 'uuid' },
+          pickupDate: { type: 'string', format: 'date' },
+          couponCode: {
+            oneOf: [
+              { type: 'string', minLength: 1, maxLength: 50 },
+              { type: 'null' },
+            ],
+          },
+          deliveryNotes: { type: 'string', maxLength: 500 },
+          tipAmount: { type: 'number', minimum: 0, maximum: 500 },
+          deliveryInstructions: { type: ['string', 'null'], maxLength: 200 },
+          handlingFee: { type: 'number', minimum: 0 },
+          lateNightFee: { type: 'number', minimum: 0 },
+          savingsTotal: { type: 'number', minimum: 0 },
+          deliveryMode: { type: 'string', enum: ['ASAP', 'SCHEDULED'] },
+          scheduledDeliveryAt: { type: ['string', 'null'] },
+          scheduledSlotStart: { type: ['string', 'null'] },
+          scheduledSlotEnd: { type: ['string', 'null'] },
+          scheduledSlotLabel: { type: ['string', 'null'], maxLength: 100 },
+        },
       },
-      deliveryNotes: { type: 'string', maxLength: 500 },
-      tipAmount: { type: 'number', minimum: 0, maximum: 500 },
-      deliveryInstructions: { type: ['string', 'null'], maxLength: 200 },
-      handlingFee: { type: 'number', minimum: 0, default: 0 },
-      lateNightFee: { type: 'number', minimum: 0, default: 0 },
-      savingsTotal: { type: 'number', minimum: 0, default: 0 },
-      // Delivery slot fields
-      deliveryMode: { type: 'string', enum: ['ASAP', 'SCHEDULED'], default: 'ASAP' },
-      scheduledDeliveryAt: { type: ['string', 'null'] },
-      scheduledSlotStart: { type: ['string', 'null'] },
-      scheduledSlotEnd: { type: ['string', 'null'] },
-      scheduledSlotLabel: { type: ['string', 'null'], maxLength: 100 },
-    },
+      {
+        type: 'object',
+        required: ['order_draft_id'],
+        properties: {
+          order_draft_id: { type: 'string', format: 'uuid' },
+          orderDraftId: { type: 'string', format: 'uuid' }
+        }
+      },
+      {
+        type: 'object',
+        required: ['orderDraftId'],
+        properties: {
+          order_draft_id: { type: 'string', format: 'uuid' },
+          orderDraftId: { type: 'string', format: 'uuid' }
+        }
+      }
+    ]
   },
   response: {
     201: {
@@ -354,4 +373,35 @@ export const adminAssignRiderSchema = {
       },
     },
   },
+}
+
+export const prepareOrderSchema = {
+  tags: ['Orders'],
+  summary: 'Prepare an order draft before payment',
+  body: {
+    type: 'object',
+    required: ['quote_id', 'address_id', 'slot_id'],
+    properties: {
+      quote_id: { type: 'string', format: 'uuid' },
+      address_id: { type: 'string', format: 'uuid' },
+      slot_id: { type: 'string', format: 'uuid' }
+    }
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        data: {
+          type: 'object',
+          properties: {
+            order_draft_id: { type: 'string', format: 'uuid' },
+            payable_amount_paise: { type: 'integer' },
+            snapshot: { type: 'object', additionalProperties: true }
+          }
+        }
+      }
+    }
+  }
 }

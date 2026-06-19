@@ -1,5 +1,7 @@
 import sharp from 'sharp'
 import axios from 'axios'
+import fs from 'node:fs'
+import path from 'node:path'
 import { logger } from '../../config/logger.js'
 
 export class WatermarkService {
@@ -90,10 +92,30 @@ export class WatermarkService {
     const watermarkText = `${baseText} - ${vendorRef} - ${today}`
 
     try {
-      // 1. Fetch file contents
-      const response = await axios.get(fileUrl, { responseType: 'arraybuffer' })
-      const buffer = Buffer.from(response.data)
-      const contentType = response.headers['content-type'] || 'image/jpeg'
+      let buffer
+      let contentType = 'image/jpeg'
+
+      // 1. Fetch file contents from local file system or URL
+      if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+        const response = await axios.get(fileUrl, { responseType: 'arraybuffer' })
+        buffer = Buffer.from(response.data)
+        contentType = response.headers['content-type'] || 'image/jpeg'
+      } else {
+        let localPath = fileUrl
+        if (fileUrl.startsWith('private://')) {
+          const parts = fileUrl.replace('private://', '').split('/')
+          const filename = parts[parts.length - 1]
+          localPath = path.join(process.cwd(), 'storage', 'documents', filename)
+        }
+        buffer = await fs.promises.readFile(localPath)
+        if (localPath.endsWith('.pdf')) {
+          contentType = 'application/pdf'
+        } else if (localPath.endsWith('.png')) {
+          contentType = 'image/png'
+        } else if (localPath.endsWith('.webp')) {
+          contentType = 'image/webp'
+        }
+      }
 
       // Only apply Sharp watermark if it's an image
       if (contentType.startsWith('image/')) {
@@ -109,3 +131,4 @@ export class WatermarkService {
     }
   }
 }
+

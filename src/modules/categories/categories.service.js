@@ -202,10 +202,13 @@ export class CategoriesService {
 
   _normalizeCategory(category) {
     if (!category) return category
-
+    const imageUrl = normalizeCloudinaryDeliveryUrl(category.image_url, 'default')
     return {
       ...category,
-      image_url: normalizeCloudinaryDeliveryUrl(category.image_url, 'default'),
+      image_url: imageUrl,
+      image: imageUrl,
+      display_order: category.sort_order,
+      availability: category.is_active,
     }
   }
 

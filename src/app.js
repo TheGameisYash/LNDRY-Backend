@@ -40,6 +40,7 @@ export const buildApp = async () => {
   await app.register(import('./plugins/helmet.plugin.js'))
   await app.register(import('./plugins/rateLimit.plugin.js'))
   await app.register(import('./plugins/auth.plugin.js'))
+  await app.register(import('./plugins/idempotency.plugin.js'))
   await app.register(import('./plugins/swagger.plugin.js'))
   await app.register(import('./plugins/multipart.plugin.js'))
   await app.register(import('./plugins/compress.plugin.js'))
@@ -92,9 +93,22 @@ export const buildApp = async () => {
     prefix: '/api/v1/users',
   })
 
+  // Customer — dedicated customer profile routes
+  await app.register(import('./modules/customer/customer.routes.js'), {
+    prefix: '/api/v1/customer',
+  })
+
+  // Devices — FCM token registration
+  await app.register(import('./modules/devices/devices.routes.js'), {
+    prefix: '/api/v1/devices',
+  })
+
   // Categories — fully implemented
   await app.register(import('./modules/categories/categories.routes.js'), {
     prefix: '/api/v1/categories',
+  })
+  await app.register(import('./modules/categories/categories.routes.js'), {
+    prefix: '/api/v1/laundry/categories',
   })
 
   // Products — fully implemented
@@ -103,6 +117,19 @@ export const buildApp = async () => {
   })
   await app.register(import('./modules/products/products.routes.js'), {
     prefix: '/api/v1/products',
+  })
+
+  // Discovery — Home and vendor listings
+  await app.register(import('./modules/discovery/discovery.routes.js'), {
+    prefix: '/api/v1/discovery',
+  })
+  // Search alias under /api/v1
+  await app.register(import('./modules/discovery/discovery.routes.js'), {
+    prefix: '/api/v1',
+  })
+  // Quotes — laundry quotes generator
+  await app.register(import('./modules/quotes/quotes.routes.js'), {
+    prefix: '/api/v1/quotes',
   })
   // URL alias fix — Flutter mobile app has a doubled /api/v1/ prefix bug
   // where it constructs product URLs as /api/v1/api/v1/garment_rates/:id instead
@@ -147,6 +174,11 @@ export const buildApp = async () => {
     prefix: '/api/v1/addresses',
   })
 
+  // Maps — Google Places Autocomplete & Details proxy
+  await app.register(import('./modules/maps/maps.routes.js'), {
+    prefix: '/api/v1/maps',
+  })
+
   // Admin — fully implemented
   await app.register(import('./modules/admin/admin.routes.js'), {
     prefix: '/api/v1/admin',
@@ -179,13 +211,45 @@ export const buildApp = async () => {
 
   // Slots — pickup slot capacity holds
   await app.register(import('./modules/slots/slots.routes.js'), {
-    prefix: '/api/v1/slots',
+    prefix: '/api/v1',
   })
 
   // Vendors — multi-vendor laundry marketplace
   await app.register(import('./modules/vendors/vendors.routes.js'), {
     prefix: '/api/v1/vendors',
   })
+
+  // Vendor applications & profiles onboarding (Section 8)
+  await app.register(import('./modules/vendors/vendor-applications.routes.js'), {
+    prefix: '/api/v1/vendor',
+  })
+
+  // Secure KYC documents streaming (Section 15)
+  await app.register(async function secureDocumentsRoutes(fastify) {
+    const { VendorsRepository } = await import('./modules/vendors/vendors.repository.js')
+    const { VendorsService } = await import('./modules/vendors/vendors.service.js')
+    const { VendorsController } = await import('./modules/vendors/vendors.controller.js')
+    
+    const repo = new VendorsRepository()
+    const service = new VendorsService(repo)
+    const controller = new VendorsController(service)
+    
+    fastify.get('/:documentId', {
+      preHandler: [fastify.authenticate],
+      schema: {
+        tags: ['Secure Documents'],
+        summary: 'Stream private secure document with watermark',
+        params: {
+          type: 'object',
+          required: ['documentId'],
+          properties: {
+            documentId: { type: 'string', format: 'uuid' }
+          }
+        }
+      }
+    }, controller.previewKycDocument.bind(controller))
+  }, { prefix: '/api/v1/secure-documents' })
+
 
   // Shop Staff — role-based access management
   await app.register(import('./modules/shop-staff/shop-staff.routes.js'), {

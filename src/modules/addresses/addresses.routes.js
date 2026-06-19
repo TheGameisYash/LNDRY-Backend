@@ -8,6 +8,8 @@ import {
   deleteAddressSchema,
   setDefaultSchema,
   validatePincodeSchema,
+  getAddressSchema,
+  validateLocationSchema,
 } from './addresses.schema.js'
 
 /**
@@ -28,6 +30,11 @@ export default async function addressesRoutes(fastify) {
     schema: listAddressesSchema,
   }, controller.list.bind(controller))
 
+  // GET /:id — Get address by ID
+  fastify.get('/:id', {
+    schema: getAddressSchema,
+  }, controller.get.bind(controller))
+
   // POST / — Create address
   fastify.post('/', {
     schema: createAddressSchema,
@@ -47,6 +54,11 @@ export default async function addressesRoutes(fastify) {
   fastify.put('/:id/default', {
     schema: setDefaultSchema,
   }, controller.setDefault.bind(controller))
+
+  // POST /validate-location — Check delivery availability by coordinates
+  fastify.post('/validate-location', {
+    schema: validateLocationSchema,
+  }, controller.validateLocation.bind(controller))
 
   // POST /validate-pincode — Check delivery availability
   fastify.post('/validate-pincode', {

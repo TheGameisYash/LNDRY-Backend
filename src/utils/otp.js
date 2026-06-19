@@ -18,6 +18,10 @@ export function generateOTP() {
   return String(num)
 }
 
+export function hashOTP(otp) {
+  return crypto.createHash('sha256').update(otp).digest('hex')
+}
+
 /**
  * Store OTP in Redis with TTL
  * @param {string} phone - Normalized 10-digit phone
@@ -25,7 +29,8 @@ export function generateOTP() {
  */
 export async function storeOTP(phone, otp) {
   const key = `${OTP_PREFIX}${phone}`
-  await redis.set(key, otp, 'EX', env.OTP_EXPIRY_SECONDS)
+  const hashed = hashOTP(otp)
+  await redis.set(key, hashed, 'EX', env.OTP_EXPIRY_SECONDS)
 }
 
 /**
@@ -56,7 +61,8 @@ export async function verifyOTP(phone, otp) {
     return { valid: false, message: 'OTP expired or not found. Request a new one.' }
   }
 
-  if (storedOTP !== otp) {
+  const hashedInput = hashOTP(otp)
+  if (storedOTP !== hashedInput) {
     // Increment attempts
     const attempts = await redis.incr(attemptsKey)
     await redis.expire(attemptsKey, env.OTP_EXPIRY_SECONDS)

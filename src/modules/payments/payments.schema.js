@@ -19,12 +19,13 @@ const paymentResponseSchema = {
 
 export const createPaymentOrderSchema = {
   tags: ['Payments'],
-  summary: 'Create a Razorpay payment order for an existing order',
+  summary: 'Create a Razorpay payment order for an existing order or order draft',
   body: {
     type: 'object',
-    required: ['orderId'],
     properties: {
       orderId: { type: 'string', format: 'uuid' },
+      order_draft_id: { type: 'string', format: 'uuid' },
+      orderDraftId: { type: 'string', format: 'uuid' }
     },
   },
   response: {
@@ -53,11 +54,15 @@ export const verifyPaymentSchema = {
   summary: 'Verify Razorpay payment signature',
   body: {
     type: 'object',
-    required: ['razorpayOrderId', 'razorpayPaymentId', 'razorpaySignature'],
     properties: {
       razorpayOrderId: { type: 'string' },
       razorpayPaymentId: { type: 'string' },
       razorpaySignature: { type: 'string' },
+      order_id: { type: 'string' },
+      payment_id: { type: 'string' },
+      signature: { type: 'string' },
+      order_draft_id: { type: 'string', format: 'uuid' },
+      orderDraftId: { type: 'string', format: 'uuid' }
     },
   },
   response: {

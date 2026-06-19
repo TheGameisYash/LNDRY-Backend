@@ -116,4 +116,22 @@ export class OrdersController {
       .header('Content-Disposition', `attachment; filename=invoice-${result.orderNumber}.pdf`)
     return reply.send(result.buffer)
   }
+
+  async prepare(request, reply) {
+    const result = await this.service.prepareOrder(request.user.id, request.body)
+    if (!result.success) {
+      const code = result.code || 'PREPARE_ORDER_FAILED'
+      return reply.code(400).send(error(result.message, code))
+    }
+    return reply.code(200).send(success(result.data, 'Order draft prepared successfully'))
+  }
+
+  async placeOrderFromDraft(request, reply) {
+    const result = await this.service.placeOrderFromDraft(request.user.id, request.body)
+    if (!result.success) {
+      const code = result.code || 'PLACE_ORDER_FAILED'
+      return reply.code(400).send(error(result.message, code))
+    }
+    return reply.code(201).send(success(result, 'Order placed successfully'))
+  }
 }

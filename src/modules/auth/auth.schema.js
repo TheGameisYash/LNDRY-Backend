@@ -21,6 +21,8 @@ export const sendOtpSchema = {
         data: {
           type: 'object',
           properties: {
+            challenge_id: { type: 'string' },
+            expires_in: { type: 'integer' },
             // In development, we return the OTP for testing
             otp: { type: 'string' },
           },
@@ -40,6 +42,16 @@ export const verifyOtpSchema = {
       phone: { type: 'string', minLength: 10, maxLength: 15 },
       otp: { type: 'string', minLength: 4, maxLength: 8 },
       role: { type: 'string', enum: ['CUSTOMER', 'RIDER', 'DELIVERY'] },
+      challenge_id: { type: 'string', format: 'uuid' },
+      device: {
+        type: 'object',
+        properties: {
+          device_id: { type: 'string' },
+          platform: { type: 'string' },
+          fcm_token: { type: 'string' },
+          app_version: { type: 'string' }
+        }
+      }
     },
   },
   response: {

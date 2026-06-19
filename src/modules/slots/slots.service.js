@@ -27,7 +27,7 @@ export class SlotsService {
       `SELECT
          slot_id,
          (SELECT COUNT(*)::int FROM slot_holds WHERE slot_id = vs.id AND booking_date = $1 AND expires_at > NOW()) AS holds_count,
-         (SELECT COUNT(*)::int FROM orders WHERE vendor_slot_id = vs.id AND pickup_date = $1 AND status != 'CANCELLED') AS orders_count
+         (SELECT COUNT(*)::int FROM orders WHERE vendor_slot_id = vs.id AND pickup_date = $1 AND status NOT IN ('PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')) AS orders_count
        FROM vendor_slots vs
        WHERE vs.id = ANY($2::uuid[])`,
       [bookingDate, slotIds]
@@ -70,7 +70,7 @@ export class SlotsService {
         [slotId, bookingDate]
       )
       const { rows: orderRows } = await client.query(
-        `SELECT COUNT(*)::int AS count FROM orders WHERE vendor_slot_id = $1 AND pickup_date = $2 AND status != 'CANCELLED'`,
+        `SELECT COUNT(*)::int AS count FROM orders WHERE vendor_slot_id = $1 AND pickup_date = $2 AND status NOT IN ('PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')`,
         [slotId, bookingDate]
       )
 
