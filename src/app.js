@@ -172,10 +172,10 @@ export const buildApp = async () => {
     prefix: '/api/v1/reviews',
   })
 
-  // Delivery — fully implemented
-  await app.register(import('./modules/delivery/delivery.routes.js'), {
-    prefix: '/api/v1/delivery',
-  })
+  // Delivery — fully implemented (Disabled per requirements)
+  // await app.register(import('./modules/delivery/delivery.routes.js'), {
+  //   prefix: '/api/v1/delivery',
+  // })
 
   // Slots — pickup slot capacity holds
   await app.register(import('./modules/slots/slots.routes.js'), {

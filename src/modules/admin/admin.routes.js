@@ -72,7 +72,7 @@ export default async function adminRoutes(fastify) {
   fastify.register(adminProductRoutes, { prefix: '/garment_rates' })
   fastify.register(adminProductRoutes, { prefix: '/products' })
   fastify.register(adminCustomerRoutes, { prefix: '/customers' })
-  fastify.register(adminRiderRoutes, { prefix: '/riders' })
+  // fastify.register(adminRiderRoutes, { prefix: '/riders' })
   fastify.register(adminNotificationRoutes, { prefix: '/notifications' })
   fastify.register(adminAnalyticsRoutes, { prefix: '/analytics' })
   fastify.register(adminBannerRoutes, { prefix: '/banners' })

@@ -77,9 +77,9 @@ async function main() {
   await test('GET', '/admin/customers/churned');
   await test('GET', '/admin/customers/vip');
 
-  // 6. ADMIN RIDERS
-  await test('GET', '/admin/riders');
-  await test('GET', '/admin/riders/live-locations');
+  // 6. ADMIN RIDERS (Disabled per requirements)
+  // await test('GET', '/admin/riders');
+  // await test('GET', '/admin/riders/live-locations');
 
   // 7. ADMIN NOTIFICATIONS
   await test('GET', '/admin/notifications/campaigns'); // correct path (not /history)
@@ -89,7 +89,7 @@ async function main() {
   await test('GET', '/admin/analytics/sales?startDate=2026-01-01&endDate=2026-12-31');
   await test('GET', '/admin/analytics/product-performance?startDate=2026-01-01&endDate=2026-12-31'); // correct (not /products)
   await test('GET', '/admin/analytics/customer-cohorts');  // correct (not /customers)
-  await test('GET', '/admin/analytics/delivery');
+  // await test('GET', '/admin/analytics/delivery');
   await test('GET', '/admin/analytics/financial?startDate=2026-01-01&endDate=2026-12-31');
 
   // 9. ADMIN BANNERS
