@@ -324,7 +324,7 @@ export class OrdersService {
       // Count orders using this slot
       const { rows: orderRows } = await client.query(
         `SELECT COUNT(*)::int AS count FROM orders 
-         WHERE vendor_slot_id = $1 AND pickup_date = $2 AND status != 'CANCELLED'`,
+         WHERE vendor_slot_id = $1 AND pickup_date = $2 AND status NOT IN ('PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')`,
         [vendorSlotId, pickupDate]
       )
 
@@ -1003,12 +1003,30 @@ export class OrdersService {
     const quoteId = body.quoteId || body.quote_id
     const addressId = body.addressId || body.address_id
     const slotId = body.slotId || body.slot_id
-    // 1. Fetch quote from Redis
-    const quoteData = await redis.get(`quote:${quoteId}`)
-    if (!quoteData) {
+
+    // 1. Fetch quote from Postgres and verify ownership
+    const quoteRes = await query(
+      `SELECT * FROM quotes WHERE id = $1`,
+      [quoteId]
+    )
+    if (quoteRes.rows.length === 0) {
       return { success: false, message: 'Quotation not found or expired', code: 'QUOTE_EXPIRED' }
     }
-    const quote = JSON.parse(quoteData)
+    const dbQuote = quoteRes.rows[0]
+    if (dbQuote.customer_id !== userId) {
+      return { success: false, message: 'Forbidden - you do not own this quotation', code: 'FORBIDDEN' }
+    }
+    if (new Date(dbQuote.expires_at) < new Date()) {
+      return { success: false, message: 'Quotation has expired', code: 'QUOTE_EXPIRED' }
+    }
+
+    const quote = {
+      quote_id: quoteId,
+      vendor_id: dbQuote.vendor_id,
+      estimate_paise: dbQuote.estimate_paise,
+      garment_lines: typeof dbQuote.pricing_snapshot === 'string' ? JSON.parse(dbQuote.pricing_snapshot) : dbQuote.pricing_snapshot,
+      estimated_weight_kg: dbQuote.estimated_weight_kg ? Number(dbQuote.estimated_weight_kg) : null
+    }
 
     // 2. Fetch address
     const address = await this.addressRepo.findByIdAndUser(addressId, userId)
@@ -1016,15 +1034,15 @@ export class OrdersService {
       return { success: false, message: 'Delivery address not found', code: 'ADDRESS_NOT_FOUND' }
     }
 
-    // 3. Verify vendor status & delivery radius eligibility (Haversine check)
+    // 3. Verify vendor status & approved service radius eligibility (Haversine check)
     const vendorRes = await query(
-      `SELECT id, is_active, status, lat, lng, delivery_radius_km
+      `SELECT id, is_active, status, lat, lng, approved_service_radius_km, vendor_approved, account_enabled, marketplace_published
        FROM vendors
        WHERE id = $1 AND deleted_at IS NULL`,
       [quote.vendor_id]
     )
     const vendor = vendorRes.rows[0]
-    if (!vendor || !vendor.is_active || vendor.status !== 'APPROVED') {
+    if (!vendor || !vendor.is_active || vendor.status !== 'APPROVED' || !vendor.vendor_approved || !vendor.account_enabled || !vendor.marketplace_published) {
       return { success: false, message: 'Vendor is not available for service', code: 'VENDOR_UNAVAILABLE' }
     }
 
@@ -1041,16 +1059,16 @@ export class OrdersService {
       [Number(address.lat), Number(vendor.lat), Number(address.lng), Number(vendor.lng)]
     )
     const distance = parseFloat(distRows[0]?.distance_km || 0)
-    if (distance > parseFloat(vendor.delivery_radius_km)) {
+    if (distance > parseFloat(vendor.approved_service_radius_km)) {
       return { success: false, message: 'Address falls outside this vendor\'s service area', code: 'OUT_OF_RADIUS' }
     }
 
-    // 4. Verify slot hold
+    // 4. Verify slot hold ownership (must match the user and the quote)
     const holdRes = await query(
       `SELECT booking_date FROM slot_holds
-       WHERE user_id = $1 AND slot_id = $2 AND vendor_id = $3 AND expires_at > NOW()
+       WHERE customer_id = $1 AND slot_id = $2 AND vendor_id = $3 AND quote_id = $4 AND expires_at > NOW()
        LIMIT 1`,
-      [userId, slotId, quote.vendor_id]
+      [userId, slotId, quote.vendor_id, quoteId]
     )
     if (holdRes.rows.length === 0) {
       return { success: false, message: 'No active slot hold found. Please hold a pickup slot before checkout.', code: 'NO_SLOT_HOLD' }
@@ -1103,6 +1121,16 @@ export class OrdersService {
   }
 
   async placeOrderFromDraft(userId, { orderDraftId }) {
+    // Check if order already exists for this draft ID (idempotency check)
+    const existingOrderRes = await query('SELECT * FROM orders WHERE id = $1', [orderDraftId])
+    if (existingOrderRes.rows.length > 0) {
+      return {
+        success: true,
+        order: existingOrderRes.rows[0],
+        status: existingOrderRes.rows[0].status
+      }
+    }
+
     const draftRes = await query('SELECT * FROM order_drafts WHERE id = $1 AND user_id = $2', [orderDraftId, userId])
     const draft = draftRes.rows[0]
     if (!draft) {
@@ -1116,7 +1144,7 @@ export class OrdersService {
       return { success: false, message: 'Payment not verified. Please complete payment first.', code: 'PAYMENT_PENDING' }
     }
 
-    const snapshot = draft.snapshot
+    const snapshot = typeof draft.snapshot === 'string' ? JSON.parse(draft.snapshot) : draft.snapshot
     const client = await getClient()
 
     try {
@@ -1136,15 +1164,16 @@ export class OrdersService {
 
       const orderInsertRes = await client.query(
         `INSERT INTO orders (
-           order_number, user_id, vendor_id, status, items, subtotal, discount_amount,
+           id, order_number, user_id, vendor_id, status, items, subtotal, discount_amount,
            delivery_fee, platform_fee, tax_amount, total_amount,
            payment_method, payment_status, delivery_address,
            vendor_slot_id, pickup_date,
            estimated_amount_paise, payable_amount_paise,
            fee_breakdown
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
          RETURNING id, order_number, user_id, vendor_id, status, created_at`,
         [
+          orderDraftId,
           orderNumber,
           userId,
           draft.vendor_id,
@@ -1168,11 +1197,13 @@ export class OrdersService {
       )
       const order = orderInsertRes.rows[0]
 
-      // Insert garment lines
+      // Insert garment lines into order_lines (replacing order_items / order_garment_lines)
       for (const line of draft.garment_lines) {
         await client.query(
-          `INSERT INTO order_items (order_id, garment_rate_id, name, price, quantity, unit, total, vendor_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          `INSERT INTO order_lines (
+             order_id, garment_type_id, name, price, quantity, unit, total, vendor_id,
+             estimated_quantity, rate_paise, total_paise
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
           [
             order.id,
             line.garment_type_id,
@@ -1181,16 +1212,7 @@ export class OrdersService {
             line.quantity,
             line.unit,
             line.total_paise / 100,
-            draft.vendor_id
-          ]
-        )
-
-        await client.query(
-          `INSERT INTO order_garment_lines (order_id, garment_rate_id, quantity, rate_paise, total_paise)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [
-            order.id,
-            line.garment_type_id,
+            draft.vendor_id,
             line.quantity,
             line.rate_paise,
             line.total_paise
@@ -1213,7 +1235,7 @@ export class OrdersService {
       await client.query('UPDATE payments SET order_id = $1 WHERE id = $2', [order.id, payment.id])
 
       // Delete the slot hold
-      await client.query('DELETE FROM slot_holds WHERE user_id = $1 AND slot_id = $2 AND vendor_id = $3', [userId, draft.slot_id, draft.vendor_id])
+      await client.query('DELETE FROM slot_holds WHERE customer_id = $1 AND slot_id = $2 AND vendor_id = $3 AND quote_id = $4', [userId, draft.slot_id, draft.vendor_id, snapshot.quote.quote_id || snapshot.quote.id])
 
       await client.query('COMMIT')
 

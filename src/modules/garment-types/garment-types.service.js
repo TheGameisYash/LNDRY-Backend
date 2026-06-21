@@ -62,7 +62,7 @@ function emptyList(filters) {
  */
 export class ProductsService {
   /**
-   * @param {import('./garment_rates.repository.js').ProductsRepository} repository
+   * @param {import('./garment-types.repository.js').ProductsRepository} repository
    * @param {object} [deps]
    * @param {AllocationService} [deps.allocationService] - Injectable for tests.
    */

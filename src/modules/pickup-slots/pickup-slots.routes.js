@@ -1,5 +1,5 @@
-import { SlotsController } from './slots.controller.js'
-import { SlotsService } from './slots.service.js'
+import { SlotsController } from './pickup-slots.controller.js'
+import { SlotsService } from './pickup-slots.service.js'
 
 export default async function slotRoutes(fastify) {
   const service = new SlotsService()

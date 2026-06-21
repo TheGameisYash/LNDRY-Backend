@@ -1,6 +1,6 @@
-import { ShopStaffController } from './shop-staff.controller.js'
-import { ShopStaffService } from './shop-staff.service.js'
-import { ShopStaffRepository } from './shop-staff.repository.js'
+import { ShopStaffController } from './vendor-employees.controller.js'
+import { ShopStaffService } from './vendor-employees.service.js'
+import { VendorEmployeesRepository as ShopStaffRepository } from './vendor-employees.repository.js'
 
 /**
  * Shop Staff routes plugin

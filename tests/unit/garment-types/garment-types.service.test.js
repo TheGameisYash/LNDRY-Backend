@@ -32,8 +32,8 @@ vi.mock('../../../src/plugins/socketio.plugin.js', () => ({
   getSocketIo: vi.fn().mockReturnValue(null),
 }))
 
-import { ProductsService } from '../../../src/modules/products/products.service.js'
-import { ProductsRepository } from '../../../src/modules/products/products.repository.js'
+import { ProductsService } from '../../../src/modules/garment-types/garment-types.service.js'
+import { ProductsRepository } from '../../../src/modules/garment-types/garment-types.repository.js'
 import { cacheGet, cacheSet } from '../../../src/utils/cache.js'
 
 // ═══════════════════════════════════════════════════════════════════════

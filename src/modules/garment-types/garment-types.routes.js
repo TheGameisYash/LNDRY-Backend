@@ -1,6 +1,6 @@
-import { ProductsController } from './products.controller.js'
-import { ProductsService } from './products.service.js'
-import { ProductsRepository } from './products.repository.js'
+import { ProductsController } from './garment-types.controller.js'
+import { ProductsService } from './garment-types.service.js'
+import { ProductsRepository } from './garment-types.repository.js'
 import { importProductsFromCSV } from '../../utils/csvImporter.js'
 import { success, error } from '../../utils/apiResponse.js'
 import {
@@ -14,7 +14,7 @@ import {
   updateProductSchema,
   updateStockSchema,
   deleteProductSchema,
-} from './products.schema.js'
+} from './garment-types.schema.js'
 
 /**
  * Products routes plugin

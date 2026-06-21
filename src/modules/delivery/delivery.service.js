@@ -5,6 +5,8 @@ import { NotificationsRepository } from '../notifications/notifications.reposito
 import { NotificationsService } from '../notifications/notifications.service.js'
 import { buildCustomerOrderEventNotification } from '../notifications/customer-order-event.helper.js'
 import { UploadsService } from '../uploads/uploads.service.js'
+import { OrderOtpService } from '../order-otp/order-otp.service.js'
+import { getClient } from '../../config/database.js'
 
 const INLINE_AUTO_ASSIGN_IN_NON_PROD =
   process.env.AUTO_ASSIGN_INLINE === 'true' ||
@@ -14,10 +16,11 @@ const INLINE_AUTO_ASSIGN_IN_NON_PROD =
  * Delivery service — business logic for delivery operations
  */
 export class DeliveryService {
-  constructor(repository, fastify) {
+  constructor(repository, fastify, options = {}) {
     this.repository = repository
     this.fastify = fastify
-    this.uploadsService = new UploadsService()
+    this.uploadsService = options.uploadsService || new UploadsService()
+    this.otpService = options.otpService || new OrderOtpService()
     this.notificationsService = fastify
       ? new NotificationsService(new NotificationsRepository(), fastify)
       : null
@@ -173,22 +176,11 @@ export class DeliveryService {
       assignmentStatus: 'ACCEPTED',
     })
 
-    // Determine if this is a pickup assignment (order status is CONFIRMED) or return delivery (status is PACKED / anything else)
+    // Determine if this is a pickup assignment (order status is VENDOR_ACCEPTED or PICKUP_ASSIGNED) or return delivery (status is PACKED or DELIVERY_ASSIGNED)
     const orderSnapshot = await this.repository.getOrderAssignmentSnapshot(orderId, riderId)
-    const isPickup = orderSnapshot && orderSnapshot.order_status === 'CONFIRMED'
+    const isPickup = orderSnapshot && (orderSnapshot.order_status === 'VENDOR_ACCEPTED' || orderSnapshot.order_status === 'PICKUP_ASSIGNED')
 
-    const otp = crypto.randomInt(1000, 9999).toString()
-    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex')
-
-    if (isPickup) {
-      if (this.repository.storePickupOtp) {
-        await this.repository.storePickupOtp(orderId, hashedOtp)
-      } else {
-        await this.repository.storeDeliveryOtp(orderId, hashedOtp)
-      }
-    } else {
-      await this.repository.storeDeliveryOtp(orderId, hashedOtp)
-    }
+    const otp = await this.otpService.generateOtp(orderId, isPickup ? 'PICKUP' : 'DELIVERY')
 
     const timelineType = isPickup ? 'RIDER_PICKUP_ACCEPTED' : 'RIDER_ACCEPTED'
     const message = isPickup ? 'Delivery partner accepted pickup' : 'Delivery partner accepted your order'
@@ -342,7 +334,7 @@ export class DeliveryService {
         code: 'ORDER_NOT_AVAILABLE',
       }
     }
-    if (assignment.status === 'IN_TRANSIT') {
+    if (assignment.status === 'IN_TRANSIT' || assignment.status === 'PICKED_UP') {
       this._logDeliveryAction('pickup:idempotent-success', {
         orderId,
         riderId,
@@ -359,6 +351,14 @@ export class DeliveryService {
       }
     }
 
+    if (assignment.order_status !== 'PICKUP_OTP_VERIFIED' && assignment.order_status !== 'PICKED_UP') {
+      throw {
+        statusCode: 400,
+        message: 'Pickup OTP must be verified first',
+        code: 'OTP_NOT_VERIFIED',
+      }
+    }
+
     const assignmentId = this._resolveAssignmentId(assignment)
     this._logDeliveryAction('pickup:lookup', {
       orderId,
@@ -367,25 +367,50 @@ export class DeliveryService {
       assignmentStatus: assignment.status,
     })
 
-    const result = await this.repository.markPickedUp(assignmentId, orderId)
-    if (!result) {
-      throw {
-        statusCode: 409,
-        message: 'Order is no longer active',
-        code: 'ORDER_NOT_AVAILABLE',
-      }
+    const client = await getClient()
+    let result = null
+    try {
+      await client.query('BEGIN')
+
+      await client.query(
+        `UPDATE orders SET status = 'PICKED_UP', updated_at = NOW() WHERE id = $1`,
+        [orderId]
+      )
+
+      const { rows } = await client.query(
+        `UPDATE order_assignments
+         SET status = 'PICKED_UP', picked_up_at = NOW(), updated_at = NOW()
+         WHERE id = $1 AND status = 'ACCEPTED'
+         RETURNING *`,
+        [assignmentId]
+      )
+      result = rows[0]
+
+      const { recordOrderEvent } = await import('../../utils/state-machine.js')
+      await recordOrderEvent(client, {
+        orderId,
+        oldStatus: 'PICKUP_OTP_VERIFIED',
+        newStatus: 'PICKED_UP',
+        actorId: riderId,
+        actorRole: 'RIDER',
+        note: 'Garments picked up from customer'
+      })
+
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
     }
 
     this._emitOrderUpdate(orderId, {
-      status: 'IN_TRANSIT',
-      orderStatus: 'OUT_FOR_DELIVERY',
+      status: 'PICKED_UP',
+      orderStatus: 'PICKED_UP',
       timelineType: 'PICKED_UP',
       riderId,
-      message: 'Your order is on its way!',
+      message: 'Your order has been picked up!',
     }, [assignment.customer_id, riderId])
-
-    // Task 12.6: Emit Socket.IO events for OUT_FOR_DELIVERY transition
-    this._emitOutForDeliveryEvents(orderId, riderId, assignment)
 
     await this._queueNotification(
       assignment.customer_id,
@@ -393,7 +418,7 @@ export class DeliveryService {
         orderId,
         orderNumber: assignment.order_number,
         timelineType: 'PICKED_UP',
-        status: 'OUT_FOR_DELIVERY',
+        status: 'PICKED_UP',
       })
     )
 
@@ -462,14 +487,12 @@ export class DeliveryService {
       (process.env.NODE_ENV !== 'production' ||
         process.env.ALLOW_DEMO_DELIVERY_ACTIONS === 'true')
 
-    if (!allowDemoDelivery && !cleanOtp && !cleanProof) {
-      throw new Error('OTP or delivery proof is required')
+    if (!allowDemoDelivery && !cleanOtp) {
+      throw new Error('OTP is required for delivery completion')
     }
 
     if (cleanOtp) {
-      const hashedOtp = crypto.createHash('sha256').update(cleanOtp).digest('hex')
-      const valid = await this.repository.verifyDeliveryOtp(orderId, hashedOtp)
-      if (!valid) throw new Error('Invalid delivery OTP')
+      await this.otpService.verifyOtp(orderId, 'DELIVERY', cleanOtp)
     }
 
     const assignmentId = this._resolveAssignmentId(assignment)
@@ -917,34 +940,52 @@ export class DeliveryService {
       throw { statusCode: 400, message: 'Assignment must be accepted first', code: 'ASSIGNMENT_NOT_ACCEPTED' }
     }
 
-    const hashed = crypto.createHash('sha256').update(otp).digest('hex')
-    const valid = await this.repository.verifyPickupOtp(orderId, hashed)
-    if (!valid) {
-      throw { statusCode: 400, message: 'Invalid pickup OTP', code: 'INVALID_OTP' }
-    }
+    await this.otpService.verifyOtp(orderId, 'PICKUP', otp)
 
     const assignmentId = this._resolveAssignmentId(assignment)
-    const result = await this.repository.markAssignmentPickedUp(assignmentId, orderId, riderId)
+    
+    // Transition order status to PICKUP_OTP_VERIFIED
+    const client = await getClient()
+    try {
+      await client.query('BEGIN')
+      
+      const { rows: [order] } = await client.query(
+        `SELECT status FROM orders WHERE id = $1 FOR UPDATE`,
+        [orderId]
+      )
+
+      await client.query(
+        `UPDATE orders SET status = 'PICKUP_OTP_VERIFIED', updated_at = NOW() WHERE id = $1`,
+        [orderId]
+      )
+
+      const { recordOrderEvent } = await import('../../utils/state-machine.js')
+      await recordOrderEvent(client, {
+        orderId,
+        oldStatus: order?.status || 'GOING_FOR_PICKUP',
+        newStatus: 'PICKUP_OTP_VERIFIED',
+        actorId: riderId,
+        actorRole: 'RIDER',
+        note: 'Pickup OTP verified successfully'
+      })
+
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
 
     this._emitOrderUpdate(orderId, {
-      status: 'PICKED_UP',
-      orderStatus: 'CONFIRMED',
-      timelineType: 'PICKED_UP',
+      status: 'PICKUP_OTP_VERIFIED',
+      orderStatus: 'PICKUP_OTP_VERIFIED',
+      timelineType: 'PICKUP_OTP_VERIFIED',
       riderId,
-      message: 'Garments picked up by rider',
+      message: 'Pickup OTP verified successfully',
     }, [assignment.customer_id, riderId])
 
-    await this._queueNotification(
-      assignment.customer_id,
-      buildCustomerOrderEventNotification({
-        orderId,
-        orderNumber: assignment.order_number,
-        timelineType: 'PICKED_UP',
-        status: 'CONFIRMED',
-      })
-    )
-
-    return result
+    return { success: true }
   }
 
   async verifyDeliveryOtp(riderId, orderId, otp) {
@@ -956,37 +997,45 @@ export class DeliveryService {
       throw { statusCode: 400, message: 'Order must be in transit before delivery', code: 'ORDER_NOT_IN_TRANSIT' }
     }
 
-    const hashed = crypto.createHash('sha256').update(otp).digest('hex')
-    const valid = await this.repository.verifyDeliveryOtp(orderId, hashed)
-    if (!valid) {
-      throw { statusCode: 400, message: 'Invalid delivery OTP', code: 'INVALID_OTP' }
-    }
+    await this.otpService.verifyOtp(orderId, 'DELIVERY', otp)
 
     const assignmentId = this._resolveAssignmentId(assignment)
-    const result = await this.repository.markDelivered(assignmentId, orderId, assignment.proof_photo_url || null)
+    
+    // Transition order status to DELIVERY_OTP_VERIFIED first
+    const client = await getClient()
+    try {
+      await client.query('BEGIN')
+      
+      const { rows: [order] } = await client.query(
+        `SELECT status FROM orders WHERE id = $1 FOR UPDATE`,
+        [orderId]
+      )
 
-    this._emitOrderUpdate(orderId, {
-      status: 'DELIVERED',
-      orderStatus: 'DELIVERED',
-      timelineType: 'DELIVERED',
-      riderId,
-      message: 'Your order has been delivered!',
-    }, [assignment.customer_id, riderId])
+      await client.query(
+        `UPDATE orders SET status = 'DELIVERY_OTP_VERIFIED', updated_at = NOW() WHERE id = $1`,
+        [orderId]
+      )
 
-    await this._queueNotification(
-      assignment.customer_id,
-      buildCustomerOrderEventNotification({
+      const { recordOrderEvent } = await import('../../utils/state-machine.js')
+      await recordOrderEvent(client, {
         orderId,
-        orderNumber: assignment.order_number,
-        timelineType: 'DELIVERED',
-        status: 'DELIVERED',
+        oldStatus: order?.status || 'OUT_FOR_DELIVERY',
+        newStatus: 'DELIVERY_OTP_VERIFIED',
+        actorId: riderId,
+        actorRole: 'RIDER',
+        note: 'Delivery OTP verified successfully'
       })
-    )
 
-    return {
-      ...result,
-      completionSummary: result.completionSummary
-        || await this.repository.getDeliveryCompletionSummary(orderId, riderId),
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
     }
+
+    // Call markDelivered (with demoMode true so it skips secondary OTP verification check since we already verified it)
+    const result = await this.markDelivered(riderId, orderId, '', assignment.proof_photo_url || null, true)
+    return result
   }
 }

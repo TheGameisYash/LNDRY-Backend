@@ -68,6 +68,14 @@ export class VendorsService {
   }
 
   async adminGetDetails(id) {
+    const app = await this.repo.findApplicationById(id)
+    if (app) {
+      const documents = await this.repo.getApplicationDocuments(id)
+      return {
+        ...app,
+        documents
+      }
+    }
     const vendor = await this.repo.findById(id)
     if (!vendor) return null
     const documents = await this.repo.getDocuments(id)
@@ -78,9 +86,22 @@ export class VendorsService {
   }
 
   async adminReview(id, { status, approvedRadius, documentReviews }) {
-    const vendor = await this.repo.findById(id)
-    if (!vendor) {
-      throw { statusCode: 404, message: 'Vendor not found' }
+    const app = await this.repo.findApplicationById(id)
+    if (!app) {
+      const vendor = await this.repo.findById(id)
+      if (!vendor) {
+        throw { statusCode: 404, message: 'Application or Vendor not found' }
+      }
+      const updates = { status }
+      if (status === 'SUSPENDED') {
+        updates.is_active = false
+        updates.account_enabled = false
+      } else if (status === 'APPROVED') {
+        updates.is_active = true
+        updates.vendor_approved = true
+        updates.account_enabled = true
+      }
+      return this.repo.update(id, updates)
     }
 
     const validStatuses = ['APPROVED', 'REJECTED', 'CORRECTION_REQUIRED', 'SUSPENDED']
@@ -90,28 +111,67 @@ export class VendorsService {
 
     const updates = { status }
     if (status === 'APPROVED') {
-      updates.is_active = true
-      if (approvedRadius) {
-        updates.delivery_radius_km = approvedRadius
-      }
-    } else {
-      updates.is_active = false
+      updates.approved_service_radius_km = approvedRadius || app.requested_service_radius_km
     }
 
-    // Process document reviews if provided
     if (Array.isArray(documentReviews)) {
       for (const dr of documentReviews) {
         await this.repo.updateDocumentStatus(dr.documentId, dr.status, dr.rejectionReason)
       }
     }
 
-    const updatedVendor = await this.repo.update(id, updates)
-    logger.info({ vendorId: id, status, approvedRadius }, 'Vendor application reviewed by admin')
+    const updatedApp = await this.repo.updateApplication(id, updates)
 
-    // Mock notification dispatch
-    logger.info({ vendorId: id, status }, `Sent notification: Vendor status updated to ${status}`)
+    if (status === 'APPROVED') {
+      let baseSlug = slugify(app.name, { lower: true, strict: true })
+      const slugCount = await this.repo.getSlugCount(baseSlug)
+      const slug = slugCount > 0 ? `${baseSlug}-${slugCount + 1}` : baseSlug
+      const branchCode = 'VND-' + Math.random().toString(36).substring(2, 8).toUpperCase()
 
-    return updatedVendor;
+      const vendor = await this.repo.create({
+        name: app.name,
+        slug,
+        branch_code: branchCode,
+        description: app.description,
+        email: app.email,
+        phone: app.phone,
+        address_line1: app.address_line1,
+        address_line2: app.address_line2,
+        city: app.city,
+        state: app.state,
+        pincode: app.pincode,
+        lat: app.lat,
+        lng: app.lng,
+        requested_service_radius_km: app.requested_service_radius_km,
+        approved_service_radius_km: approvedRadius || app.requested_service_radius_km,
+        bank_account_number: app.bank_account_number,
+        bank_ifsc: app.bank_ifsc,
+        bank_name: app.bank_name,
+        bank_holder_name: app.bank_holder_name,
+        gst_number: app.gst_number,
+        pan_number: app.pan_number,
+        created_by: app.owner_id,
+        status: 'APPROVED',
+        vendor_approved: true,
+        account_enabled: true,
+        marketplace_published: false
+      })
+
+      await query(
+        `UPDATE vendor_documents SET vendor_id = $1 WHERE vendor_application_id = $2`,
+        [vendor.id, app.id]
+      )
+
+      await query(
+        `INSERT INTO vendor_employees (vendor_id, user_id, role, status)
+         VALUES ($1, $2, 'VENDOR_OWNER', 'ACTIVE')
+         ON CONFLICT (vendor_id, user_id) DO UPDATE SET role = 'VENDOR_OWNER', status = 'ACTIVE'`,
+        [vendor.id, app.owner_id]
+      )
+    }
+
+    logger.info({ vendorApplicationId: id, status, approvedRadius }, 'Vendor application reviewed by admin')
+    return updatedApp
   }
 
   async previewKycDocument(docId, user) {
@@ -149,50 +209,34 @@ export class VendorsService {
   }
 
   async createApplication(userId, data) {
-    const existing = await this.repo.findByUserId(userId)
+    const existing = await this.repo.findApplicationByOwnerId(userId)
     if (existing) {
       return existing
     }
 
-    let baseSlug = slugify(data.name || 'Vendor', { lower: true, strict: true })
-    const slugCount = await this.repo.getSlugCount(baseSlug)
-    const slug = slugCount > 0 ? `${baseSlug}-${slugCount + 1}` : baseSlug
-    const branchCode = 'VND-' + Math.random().toString(36).substring(2, 8).toUpperCase()
-
     const applicationData = {
+      owner_id: userId,
       name: data.name || 'My Laundry Business',
-      address_line1: data.address_line1 || 'Draft Address',
-      city: data.city || 'Draft City',
-      state: data.state || 'Draft State',
-      pincode: data.pincode || '000000',
-      lat: data.lat || 0,
-      lng: data.lng || 0,
-      slug,
-      branch_code: branchCode,
-      created_by: userId,
-      status: 'DRAFT',
-      is_active: false
     }
 
-    return this.repo.create(applicationData)
+    return this.repo.createApplication(applicationData)
   }
 
   async getApplicationMe(userId) {
-    const vendor = await this.repo.findByUserId(userId)
-    if (!vendor) {
+    const app = await this.repo.findApplicationByOwnerId(userId)
+    if (!app) {
       throw { statusCode: 404, message: 'No onboarding application found' }
     }
-    const documents = await this.repo.getDocuments(vendor.id)
+    const documents = await this.repo.getApplicationDocuments(app.id)
     
-    // Check missing steps for onboarding wizard
     const missingSteps = []
-    if (!vendor.bank_account_number || !vendor.bank_ifsc) {
+    if (!app.bank_account_number || !app.bank_ifsc) {
       missingSteps.push('bank_details')
     }
-    if (!vendor.gst_number && !vendor.pan_number) {
+    if (!app.gst_number && !app.pan_number) {
       missingSteps.push('tax_details')
     }
-    const requiredDocs = ['owner_identity', 'shop_photo', 'registration_document']
+    const requiredDocs = ['owner_identity', 'shop_photo']
     const uploadedDocs = documents.map(d => d.document_type)
     for (const docType of requiredDocs) {
       if (!uploadedDocs.includes(docType)) {
@@ -202,7 +246,7 @@ export class VendorsService {
 
     return {
       application: {
-        ...vendor,
+        ...app,
         documents
       },
       missing_steps: missingSteps,
@@ -210,14 +254,14 @@ export class VendorsService {
   }
 
   async verifyApplicationAccess(userId, applicationId) {
-    const vendor = await this.repo.findById(applicationId)
-    if (!vendor) {
+    const app = await this.repo.findApplicationById(applicationId)
+    if (!app) {
       throw { statusCode: 404, message: 'Application not found' }
     }
-    if (vendor.created_by !== userId) {
+    if (app.owner_id !== userId) {
       throw { statusCode: 403, message: 'Forbidden' }
     }
-    return vendor
+    return app
   }
 
   async updateApplicationOwner(userId, appId, data) {
@@ -230,7 +274,7 @@ export class VendorsService {
     if (data.bank_name) updates.bank_name = data.bank_name
     if (data.bank_holder_name) updates.bank_holder_name = data.bank_holder_name
     
-    return this.repo.update(appId, updates)
+    return this.repo.updateApplication(appId, updates)
   }
 
   async updateApplicationBusiness(userId, appId, data) {
@@ -242,7 +286,7 @@ export class VendorsService {
     if (data.gst_number) updates.gst_number = data.gst_number
     if (data.pan_number) updates.pan_number = data.pan_number
 
-    return this.repo.update(appId, updates)
+    return this.repo.updateApplication(appId, updates)
   }
 
   async updateApplicationLocation(userId, appId, data) {
@@ -256,27 +300,27 @@ export class VendorsService {
     if (data.lat !== undefined) updates.lat = data.lat
     if (data.lng !== undefined) updates.lng = data.lng
 
-    return this.repo.update(appId, updates)
+    return this.repo.updateApplication(appId, updates)
   }
 
   async updateApplicationRadius(userId, appId, data) {
     await this.verifyApplicationAccess(userId, appId)
     const updates = {}
     if (data.requested_radius_km !== undefined) {
-      updates.delivery_radius_km = data.requested_radius_km
+      updates.requested_service_radius_km = data.requested_radius_km
     }
-    return this.repo.update(appId, updates)
+    return this.repo.updateApplication(appId, updates)
   }
 
   async addApplicationDocument(userId, appId, type, fileUrl) {
     await this.verifyApplicationAccess(userId, appId)
-    return this.repo.addDocument(appId, type, fileUrl)
+    return this.repo.addApplicationDocument(appId, type, fileUrl)
   }
 
   async deleteApplicationDocument(userId, appId, docId) {
     await this.verifyApplicationAccess(userId, appId)
     const doc = await this.repo.getDocumentById(docId)
-    if (!doc || doc.vendor_id !== appId) {
+    if (!doc || doc.vendor_application_id !== appId) {
       throw { statusCode: 404, message: 'Document not found' }
     }
     await query('DELETE FROM vendor_documents WHERE id = $1', [docId])
@@ -284,19 +328,29 @@ export class VendorsService {
   }
 
   async submitApplication(userId, appId) {
-    const vendor = await this.verifyApplicationAccess(userId, appId)
-    if (vendor.status !== 'DRAFT' && vendor.status !== 'CORRECTION_REQUIRED') {
+    const app = await this.verifyApplicationAccess(userId, appId)
+    if (app.status !== 'DRAFT' && app.status !== 'CORRECTION_REQUIRED') {
       throw { statusCode: 400, message: 'Application is already submitted' }
     }
-    return this.repo.update(appId, { status: 'WAITING_FOR_APPROVAL' })
+    const docs = await this.repo.getApplicationDocuments(appId)
+    const uploadedTypes = docs.map(d => d.document_type)
+    if (!uploadedTypes.includes('owner_identity') || !uploadedTypes.includes('shop_photo')) {
+      throw { statusCode: 400, message: 'Missing required onboarding documents: Owner Identity and Shop Photo are required' }
+    }
+    return this.repo.updateApplication(appId, { status: 'WAITING_FOR_APPROVAL' })
   }
 
   async resubmitApplication(userId, appId) {
-    const vendor = await this.verifyApplicationAccess(userId, appId)
-    if (vendor.status !== 'CORRECTION_REQUIRED') {
+    const app = await this.verifyApplicationAccess(userId, appId)
+    if (app.status !== 'CORRECTION_REQUIRED') {
       throw { statusCode: 400, message: 'Application is not in CORRECTION_REQUIRED status' }
     }
-    return this.repo.update(appId, { status: 'WAITING_FOR_APPROVAL' })
+    const docs = await this.repo.getApplicationDocuments(appId)
+    const uploadedTypes = docs.map(d => d.document_type)
+    if (!uploadedTypes.includes('owner_identity') || !uploadedTypes.includes('shop_photo')) {
+      throw { statusCode: 400, message: 'Missing required onboarding documents: Owner Identity and Shop Photo are required' }
+    }
+    return this.repo.updateApplication(appId, { status: 'WAITING_FOR_APPROVAL' })
   }
 
   async publishProfile(userId) {

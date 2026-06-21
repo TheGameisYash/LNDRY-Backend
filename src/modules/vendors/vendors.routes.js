@@ -7,69 +7,69 @@ export default async function vendorRoutes(fastify) {
   const service = new VendorsService(repository)
   const controller = new VendorsController(service)
 
-  // Public/Onboarding routes
-  fastify.post('/apply', {
-    preHandler: [fastify.authenticate],
-    schema: {
-      tags: ['Vendors'],
-      summary: 'Apply for a new vendor onboarding application',
-      body: {
-        type: 'object',
-        required: ['name', 'address_line1', 'city', 'state', 'pincode', 'lat', 'lng'],
-        properties: {
-          name: { type: 'string', minLength: 2, maxLength: 200 },
-          description: { type: 'string' },
-          logo_url: { type: 'string' },
-          banner_url: { type: 'string' },
-          phone: { type: 'string' },
-          email: { type: 'string', format: 'email' },
-          address_line1: { type: 'string' },
-          address_line2: { type: 'string' },
-          city: { type: 'string' },
-          state: { type: 'string' },
-          pincode: { type: 'string' },
-          lat: { type: 'number' },
-          lng: { type: 'number' },
-          delivery_radius_km: { type: 'number', minimum: 0.5 },
-          gst_number: { type: 'string' },
-          pan_number: { type: 'string' },
-          operating_hours: { type: 'object' }
-        }
-      }
-    }
-  }, controller.apply.bind(controller))
+  // Public/Onboarding routes (COMMENTED OUT - USE canonical /vendor-applications instead)
+  // fastify.post('/apply', {
+  //   preHandler: [fastify.authenticate],
+  //   schema: {
+  //     tags: ['Vendors'],
+  //     summary: 'Apply for a new vendor onboarding application',
+  //     body: {
+  //       type: 'object',
+  //       required: ['name', 'address_line1', 'city', 'state', 'pincode', 'lat', 'lng'],
+  //       properties: {
+  //         name: { type: 'string', minLength: 2, maxLength: 200 },
+  //         description: { type: 'string' },
+  //         logo_url: { type: 'string' },
+  //         banner_url: { type: 'string' },
+  //         phone: { type: 'string' },
+  //         email: { type: 'string', format: 'email' },
+  //         address_line1: { type: 'string' },
+  //         address_line2: { type: 'string' },
+  //         city: { type: 'string' },
+  //         state: { type: 'string' },
+  //         pincode: { type: 'string' },
+  //         lat: { type: 'number' },
+  //         lng: { type: 'number' },
+  //         delivery_radius_km: { type: 'number', minimum: 0.5 },
+  //         gst_number: { type: 'string' },
+  //         pan_number: { type: 'string' },
+  //         operating_hours: { type: 'object' }
+  //       }
+  //     }
+  //   }
+  // }, controller.apply.bind(controller))
 
-  fastify.get('/me', {
-    preHandler: [fastify.authenticate],
-    schema: {
-      tags: ['Vendors'],
-      summary: 'Get current vendor profile'
-    }
-  }, controller.getProfile.bind(controller))
+  // fastify.get('/me', {
+  //   preHandler: [fastify.authenticate],
+  //   schema: {
+  //     tags: ['Vendors'],
+  //     summary: 'Get current vendor profile'
+  //   }
+  // }, controller.getProfile.bind(controller))
 
-  fastify.put('/me', {
-    preHandler: [fastify.authenticate],
-    schema: {
-      tags: ['Vendors'],
-      summary: 'Update current vendor profile'
-    }
-  }, controller.updateProfile.bind(controller))
+  // fastify.put('/me', {
+  //   preHandler: [fastify.authenticate],
+  //   schema: {
+  //     tags: ['Vendors'],
+  //     summary: 'Update current vendor profile'
+  //   }
+  // }, controller.updateProfile.bind(controller))
 
-  fastify.post('/me/documents', {
-    preHandler: [fastify.authenticate],
-    schema: {
-      tags: ['Vendors'],
-      summary: 'Upload onboarding KYC document',
-      body: {
-        type: 'object',
-        required: ['documentType', 'fileUrl'],
-        properties: {
-          documentType: { type: 'string', enum: ['owner_identity', 'shop_photo', 'registration_document', 'gst_certificate'] },
-          fileUrl: { type: 'string' }
-        }
-      }
-    }
-  }, controller.uploadDocument.bind(controller))
+  // fastify.post('/me/documents', {
+  //   preHandler: [fastify.authenticate],
+  //   schema: {
+  //     tags: ['Vendors'],
+  //     summary: 'Upload onboarding KYC document',
+  //     body: {
+  //       type: 'object',
+  //       required: ['documentType', 'fileUrl'],
+  //       properties: {
+  //         documentType: { type: 'string', enum: ['owner_identity', 'shop_photo', 'registration_document', 'gst_certificate'] },
+  //         fileUrl: { type: 'string' }
+  //       }
+  //     }
+  //   }
+  // }, controller.uploadDocument.bind(controller))
 
   // Admin approval/review routes
   const adminPreHandlers = [fastify.authenticate, fastify.authorize(['ADMIN'])]

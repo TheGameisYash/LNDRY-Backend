@@ -89,7 +89,7 @@ export class AdminOrdersRepository {
 
   async getOrderDelivery(orderId) {
     const { rows } = await query(
-      'SELECT * FROM delivery_assignments WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1',
+      'SELECT * FROM order_assignments WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1',
       [orderId]
     )
     return rows[0] || null
@@ -132,7 +132,7 @@ export class AdminOrdersRepository {
       await client.query('BEGIN')
 
       await client.query(
-        `UPDATE delivery_assignments
+        `UPDATE order_assignments
          SET status = 'CANCELLED',
              cancel_reason = 'Reassigned by admin',
              cancelled_at = NOW(),
@@ -149,7 +149,7 @@ export class AdminOrdersRepository {
 
       // Create a fresh assignment row (no ON CONFLICT dependency on order_id).
       const { rows: [assignment] } = await client.query(
-        `INSERT INTO delivery_assignments (order_id, rider_id, status, assigned_at, earnings)
+        `INSERT INTO order_assignments (order_id, rider_id, status, assigned_at, earnings)
          SELECT $1, $2, 'ASSIGNED', NOW(), COALESCE(NULLIF(o.delivery_fee, 0), 25)
          FROM orders o
          WHERE o.id = $1
@@ -174,7 +174,7 @@ export class AdminOrdersRepository {
       const results = []
       for (const { orderId, riderId } of assignments) {
         await client.query(
-          `UPDATE delivery_assignments
+          `UPDATE order_assignments
            SET status = 'CANCELLED',
                cancel_reason = 'Reassigned by bulk assign',
                cancelled_at = NOW(),
@@ -190,7 +190,7 @@ export class AdminOrdersRepository {
         )
 
         const { rows: [assignment] } = await client.query(
-          `INSERT INTO delivery_assignments (order_id, rider_id, status, assigned_at, earnings)
+          `INSERT INTO order_assignments (order_id, rider_id, status, assigned_at, earnings)
            SELECT $1, $2, 'ASSIGNED', NOW(), COALESCE(NULLIF(o.delivery_fee, 0), 25)
            FROM orders o
            WHERE o.id = $1

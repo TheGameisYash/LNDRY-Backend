@@ -51,7 +51,7 @@ const dbMock = vi.hoisted(() => {
 })
 vi.mock('../../../src/config/database.js', () => dbMock)
 
-import { ShopStaffService } from '../../../src/modules/shop-staff/shop-staff.service.js'
+import { ShopStaffService } from '../../../src/modules/vendor-employees/vendor-employees.service.js'
 
 const SHOP_ID = '550e8400-e29b-41d4-a716-446655440000'
 const STAFF_ID = '99999999-9999-9999-9999-999999999999'
@@ -105,7 +105,7 @@ describe('ShopStaffService.resetPassword', () => {
       id: STAFF_ID,
       user_id: TARGET_USER_ID,
       vendor_id: SHOP_ID,
-      role: 'SHOP_STAFF',
+      role: 'VENDOR_EMPLOYEE',
       is_active: true,
     })
     const service = new ShopStaffService(repo)
@@ -237,7 +237,7 @@ describe('ShopStaffService.deactivate', () => {
       id: STAFF_ID,
       user_id: TARGET_USER_ID,
       vendor_id: SHOP_ID,
-      role: 'SHOP_STAFF',
+      role: 'VENDOR_EMPLOYEE',
       is_active: true,
     })
     repo.softDelete.mockResolvedValueOnce(true)

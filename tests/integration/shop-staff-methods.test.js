@@ -136,7 +136,7 @@ beforeAll(async () => {
 
   // Register shop-staff routes (both mounts)
   const { default: shopStaffRoutes } = await import(
-    '../../src/modules/shop-staff/shop-staff.routes.js'
+    '../../src/modules/vendor-employees/vendor-employees.routes.js'
   )
   await app.register(shopStaffRoutes, { prefix: '/api/v1/shop-staff' })
   await app.register(shopStaffRoutes, { prefix: '/api/v1/vendors/:shopId/staff' })
@@ -232,13 +232,13 @@ describe('Shop Staff method validation (Task 23.3)', () => {
         if (sql.includes('is_blocked') && sql.includes('session_version')) {
           return { rows: [{ is_blocked: false, session_version: null }] }
         }
-        if (sql.includes('vendor_staff') && sql.includes('SELECT')) {
+        if ((sql.includes('vendor_staff') || sql.includes('vendor_employees')) && sql.includes('SELECT')) {
           return {
             rows: [{
               id: STAFF_RECORD_ID,
               vendor_id: SHOP_ID,
               user_id: '22222222-2222-2222-2222-222222222222',
-              role: 'SHOP_STAFF',
+              role: 'VENDOR_EMPLOYEE',
               permissions: [],
               is_active: true,
             }],
@@ -250,7 +250,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
               id: STAFF_RECORD_ID,
               vendor_id: SHOP_ID,
               user_id: '22222222-2222-2222-2222-222222222222',
-              role: 'SHOP_MANAGER',
+              role: 'VENDOR_EMPLOYEE',
               permissions: [],
               is_active: true,
             }],
@@ -263,7 +263,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
         query: vi.fn().mockResolvedValue({
           rows: [{
             id: STAFF_RECORD_ID,
-            role: 'SHOP_MANAGER',
+            role: 'VENDOR_EMPLOYEE',
             permissions: [],
             is_active: true,
           }],
@@ -279,7 +279,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
           authorization: `Bearer ${token}`,
           'x-shop-id': SHOP_ID,
         },
-        payload: { role: 'SHOP_MANAGER' },
+        payload: { role: 'VENDOR_EMPLOYEE' },
       })
 
       // Should not be a validation error — may be 200 or 404 depending
@@ -303,7 +303,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
           authorization: `Bearer ${token}`,
           'x-shop-id': SHOP_ID,
         },
-        payload: { role: 'SHOP_MANAGER' },
+        payload: { role: 'VENDOR_EMPLOYEE' },
       })
 
       expect(res.statusCode).toBe(405)
@@ -329,8 +329,8 @@ describe('Shop Staff method validation (Task 23.3)', () => {
           'x-shop-id': SHOP_ID,
         },
         payload: {
-          role: 'SHOP_ADMIN',
-          permissions: ['manage_orders'],
+          role: 'VENDOR_OWNER',
+          permissions: ['shop_orders.view'],
           is_active: true,
         },
       })
@@ -345,7 +345,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
       const res = await app.inject({
         method: 'PUT',
         url: `/api/v1/shop-staff/${STAFF_RECORD_ID}`,
-        payload: { role: 'SHOP_MANAGER' },
+        payload: { role: 'VENDOR_EMPLOYEE' },
       })
 
       // Unauthenticated users see 401 before 405 — security first
@@ -367,7 +367,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
         headers: {
           authorization: `Bearer ${token}`,
         },
-        payload: { role: 'SHOP_MANAGER' },
+        payload: { role: 'VENDOR_EMPLOYEE' },
       })
 
       expect(res.statusCode).toBe(405)

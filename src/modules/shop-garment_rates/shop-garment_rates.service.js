@@ -7,7 +7,7 @@ import {
   stockNotificationsQueue,
 } from '../../config/bullmq.js'
 import { getSocketIo } from '../../plugins/socketio.plugin.js'
-import { ShopStaffRepository } from '../shop-staff/shop-staff.repository.js'
+import { VendorEmployeesRepository as ShopStaffRepository } from '../vendor-employees/vendor-employees.repository.js'
 import {
   emit as emitAudit,
   emitInTx as emitAuditInTx,

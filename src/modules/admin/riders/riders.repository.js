@@ -194,7 +194,7 @@ export class AdminRidersRepository {
               da.order_id, da.status AS delivery_status
        FROM users u
        JOIN rider_profiles rp ON rp.user_id = u.id
-       LEFT JOIN delivery_assignments da ON da.rider_id = u.id
+       LEFT JOIN order_assignments da ON da.rider_id = u.id
          AND da.status IN ('ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'IN_TRANSIT')
        WHERE rp.is_online = true AND u.is_active = true
        ORDER BY u.name`

@@ -14,7 +14,7 @@ const databaseMock = vi.hoisted(() => ({
 }))
 vi.mock('../../../src/config/database.js', () => databaseMock)
 
-import { ShopStaffRepository } from '../../../src/modules/shop-staff/shop-staff.repository.js'
+import { VendorEmployeesRepository as ShopStaffRepository } from '../../../src/modules/vendor-employees/vendor-employees.repository.js'
 
 const STAFF_ID = '11111111-1111-1111-1111-111111111111'
 const SHOP_ID = '22222222-2222-2222-2222-222222222222'
@@ -112,10 +112,10 @@ describe('ShopStaffRepository.softDelete — converts hard delete to soft delete
     const ok = await repo.softDelete(STAFF_ID, SHOP_ID)
 
     const [sql, params] = databaseMock.query.mock.calls[0]
-    expect(sql).toMatch(/UPDATE\s+vendor_staff/i)
+    expect(sql).toMatch(/UPDATE\s+vendor_employees/i)
     expect(sql).toMatch(/SET\s+deleted_at\s*=\s*NOW\(\)/i)
     expect(sql).toMatch(/is_active\s*=\s*false/i)
-    expect(sql).not.toMatch(/DELETE\s+FROM\s+vendor_staff/i)
+    expect(sql).not.toMatch(/DELETE\s+FROM\s+vendor_employees/i)
     expect(sql).toMatch(
       /WHERE\s+id\s*=\s*\$1\s+AND\s+vendor_id\s*=\s*\$2\s+AND\s+deleted_at\s+IS\s+NULL/i
     )
@@ -141,7 +141,7 @@ describe('ShopStaffRepository.update — never resurrects soft-deleted rows (Req
     await repo.update(STAFF_ID, SHOP_ID, { is_active: false })
 
     const [sql] = databaseMock.query.mock.calls[0]
-    expect(sql).toMatch(/UPDATE\s+vendor_staff\s+SET/i)
+    expect(sql).toMatch(/UPDATE\s+vendor_employees\s+SET/i)
     expect(sql).toMatch(/AND\s+deleted_at\s+IS\s+NULL/i)
   })
 })
@@ -175,7 +175,7 @@ describe('ShopStaffRepository — non-list reads also exclude soft-deleted', () 
 
   it('findActiveUserIdsByShopAndRoles filters by deleted_at IS NULL', async () => {
     const repo = new ShopStaffRepository()
-    await repo.findActiveUserIdsByShopAndRoles(SHOP_ID, ['SHOP_ADMIN'])
+    await repo.findActiveUserIdsByShopAndRoles(SHOP_ID, ['VENDOR_OWNER'])
 
     const [sql] = databaseMock.query.mock.calls[0]
     expect(sql).toMatch(/deleted_at\s+IS\s+NULL/i)

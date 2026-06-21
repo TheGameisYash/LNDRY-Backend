@@ -113,7 +113,7 @@ export class AdminAnalyticsRepository {
               AVG(da.rating) AS avg_rating,
               COUNT(CASE WHEN da.delivery_time_minutes <= 30 THEN 1 END)::int AS on_time_count,
               SUM(da.tip_amount) AS total_tips
-       FROM delivery_assignments da ${dateFilter}`,
+       FROM order_assignments da ${dateFilter}`,
       params
     )
 
@@ -121,7 +121,7 @@ export class AdminAnalyticsRepository {
       `SELECT EXTRACT(HOUR FROM da.delivered_at AT TIME ZONE 'Asia/Kolkata')::int AS hour,
               COUNT(*)::int AS deliveries,
               AVG(da.delivery_time_minutes) AS avg_time
-       FROM delivery_assignments da ${dateFilter}
+       FROM order_assignments da ${dateFilter}
        GROUP BY hour ORDER BY hour`,
       params
     )

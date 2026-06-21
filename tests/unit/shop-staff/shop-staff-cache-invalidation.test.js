@@ -33,7 +33,7 @@ vi.mock('../../../src/config/database.js', () => {
   }
 })
 
-import { ShopStaffService } from '../../../src/modules/shop-staff/shop-staff.service.js'
+import { ShopStaffService } from '../../../src/modules/vendor-employees/vendor-employees.service.js'
 import { invalidateStaffActiveCache } from '../../../src/middlewares/shop-scope.js'
 
 const SHOP_ID = '550e8400-e29b-41d4-a716-446655440000'
@@ -72,14 +72,14 @@ describe('ShopStaffService.update — cache invalidation', () => {
       id: STAFF_ID,
       user_id: TARGET_USER_ID,
       vendor_id: SHOP_ID,
-      role: 'SHOP_VIEWER',
+      role: 'VENDOR_EMPLOYEE',
       is_active: true,
     })
     repo.update.mockResolvedValueOnce({
       id: STAFF_ID,
       user_id: TARGET_USER_ID,
       vendor_id: SHOP_ID,
-      role: 'SHOP_VIEWER',
+      role: 'VENDOR_EMPLOYEE',
       is_active: false,
     })
     const service = new ShopStaffService(repo)

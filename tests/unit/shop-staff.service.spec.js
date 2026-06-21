@@ -47,13 +47,13 @@ vi.mock('../../src/config/database.js', () => {
   }
 })
 
-import { ShopStaffService } from '../../src/modules/shop-staff/shop-staff.service.js'
+import { ShopStaffService } from '../../src/modules/vendor-employees/vendor-employees.service.js'
 import {
   createShopStaffSchema,
   updateShopStaffSchema,
   PERMISSION_ENUM,
   VALID_ROLES,
-} from '../../src/modules/shop-staff/shop-staff.schema.js'
+} from '../../src/modules/vendor-employees/vendor-employees.schema.js'
 import { invalidateStaffActiveCache } from '../../src/middlewares/shop-scope.js'
 
 // ─── Test fixtures ────────────────────────────────────────────
@@ -81,7 +81,7 @@ function makeRepoMock() {
 const VALID_CREATE_PAYLOAD = {
   vendor_id: SHOP_ID,
   user_id: TARGET_USER_ID,
-  role: 'SHOP_MANAGER',
+  role: 'VENDOR_EMPLOYEE',
   permissions: ['shop_orders.view', 'vendor_services.view'],
 }
 
@@ -89,7 +89,7 @@ const MOCK_STAFF_RECORD = {
   id: STAFF_ID,
   user_id: TARGET_USER_ID,
   vendor_id: SHOP_ID,
-  role: 'SHOP_MANAGER',
+  role: 'VENDOR_EMPLOYEE',
   permissions: ['shop_orders.view', 'vendor_services.view'],
   is_active: true,
   invited_by: REQUESTER_ID,
@@ -209,35 +209,28 @@ describe('ShopStaffService.create() — limits and constraints', () => {
     expect(repo.create).toHaveBeenCalledWith({
       user_id: TARGET_USER_ID,
       vendor_id: SHOP_ID,
-      role: 'SHOP_MANAGER',
+      role: 'VENDOR_EMPLOYEE',
       permissions: ['shop_orders.view', 'vendor_services.view'],
       invited_by: REQUESTER_ID,
     })
   })
 
-  it('defaults permissions to the SHOP_VIEWER default set when caller provides none', async () => {
+  it('defaults permissions to the VENDOR_EMPLOYEE default set when caller provides none', async () => {
     repo.findByUserAndShop.mockResolvedValueOnce(null)
     repo.countActiveByShop.mockResolvedValueOnce(0)
     repo.countActiveByUser.mockResolvedValueOnce(0)
     repo.create.mockResolvedValueOnce({ ...MOCK_STAFF_RECORD, permissions: [] })
 
     await service.create(
-      { vendor_id: SHOP_ID, user_id: TARGET_USER_ID, role: 'SHOP_VIEWER' },
+      { vendor_id: SHOP_ID, user_id: TARGET_USER_ID, role: 'VENDOR_EMPLOYEE' },
       REQUESTER_ID
     )
 
-    // SHOP_VIEWER default is exactly the 6 read-only permissions per
-    // R16 AC#14 / SHOP_ROLE_DEFAULT_PERMISSIONS.SHOP_VIEWER. The service
-    // converts the Set to a sorted array, so we assert containsAll.
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({
         permissions: expect.arrayContaining([
-          'vendors.view',
-          'vendor_services.view',
           'shop_orders.view',
-          'shop_transactions.view',
-          'shop_financials.view',
-          'shop_reports.view',
+          'shop_orders.update_status',
         ]),
       })
     )
@@ -270,7 +263,7 @@ describe('ShopStaffService.create() — R20 new-user shape', () => {
         vendor_id: SHOP_ID,
         email: 'sam@example.com',
         name: 'Sam',
-        role: 'SHOP_MANAGER',
+        role: 'VENDOR_EMPLOYEE',
         generate_temp_password: true,
       },
       { invitedBy: REQUESTER_ID, invitedByPlatformRole: 'ADMIN' }
@@ -306,7 +299,7 @@ describe('ShopStaffService.create() — R20 new-user shape', () => {
           vendor_id: SHOP_ID,
           email: 'taken@example.com',
           name: 'Sam',
-          role: 'SHOP_MANAGER',
+          role: 'VENDOR_EMPLOYEE',
           generate_temp_password: true,
         },
         { invitedBy: REQUESTER_ID, invitedByPlatformRole: 'ADMIN' }
@@ -322,7 +315,7 @@ describe('ShopStaffService.create() — R20 new-user shape', () => {
           vendor_id: SHOP_ID,
           email: 'sam2@example.com',
           name: 'Sam',
-          role: 'SHOP_VIEWER',
+          role: 'VENDOR_EMPLOYEE',
           permissions: ['vendor_services.view', 'made.up.permission'],
           generate_temp_password: true,
         },
@@ -341,11 +334,11 @@ describe('ShopStaffService.create() — role-creation rules (R16.9–R16.13, R16
     service = new ShopStaffService(repo)
   })
 
-  it('SHOP_ADMIN cannot create another SHOP_ADMIN (R16.10)', async () => {
+  it('VENDOR_OWNER cannot create another VENDOR_OWNER', async () => {
     await expect(
       service.create(
-        { ...VALID_CREATE_PAYLOAD, role: 'SHOP_ADMIN' },
-        { invitedBy: REQUESTER_ID, invitedByRole: 'SHOP_ADMIN' }
+        { ...VALID_CREATE_PAYLOAD, role: 'VENDOR_OWNER' },
+        { invitedBy: REQUESTER_ID, invitedByRole: 'VENDOR_OWNER' }
       )
     ).rejects.toMatchObject({
       statusCode: 403,
@@ -353,12 +346,12 @@ describe('ShopStaffService.create() — role-creation rules (R16.9–R16.13, R16
     })
   })
 
-  it('SHOP_MANAGER cannot create SHOP_ADMIN or SHOP_MANAGER (R16.11)', async () => {
-    for (const role of ['SHOP_ADMIN', 'SHOP_MANAGER']) {
+  it('VENDOR_EMPLOYEE cannot create VENDOR_OWNER or VENDOR_EMPLOYEE', async () => {
+    for (const role of ['VENDOR_OWNER', 'VENDOR_EMPLOYEE']) {
       await expect(
         service.create(
           { ...VALID_CREATE_PAYLOAD, role },
-          { invitedBy: REQUESTER_ID, invitedByRole: 'SHOP_MANAGER' }
+          { invitedBy: REQUESTER_ID, invitedByRole: 'VENDOR_EMPLOYEE' }
         )
       ).rejects.toMatchObject({
         statusCode: 403,
@@ -367,29 +360,17 @@ describe('ShopStaffService.create() — role-creation rules (R16.9–R16.13, R16
     }
   })
 
-  it('SHOP_STAFF cannot create any staff (R16.20)', async () => {
-    await expect(
-      service.create(
-        { ...VALID_CREATE_PAYLOAD, role: 'SHOP_VIEWER' },
-        { invitedBy: REQUESTER_ID, invitedByRole: 'SHOP_STAFF' }
-      )
-    ).rejects.toMatchObject({
-      statusCode: 403,
-      code: 'STAFF_ROLE_FORBIDDEN',
-    })
-  })
-
-  it('HQ_MANAGER may create SHOP_ADMIN (R16.13)', async () => {
+  it('HQ_MANAGER may create VENDOR_OWNER', async () => {
     repo.findByUserAndShop.mockResolvedValueOnce(null)
     repo.countActiveByShop.mockResolvedValueOnce(0)
     repo.countActiveByUser.mockResolvedValueOnce(0)
     repo.create.mockResolvedValueOnce({
       ...MOCK_STAFF_RECORD,
-      role: 'SHOP_ADMIN',
+      role: 'VENDOR_OWNER',
     })
 
     const result = await service.create(
-      { ...VALID_CREATE_PAYLOAD, role: 'SHOP_ADMIN' },
+      { ...VALID_CREATE_PAYLOAD, role: 'VENDOR_OWNER' },
       { invitedBy: REQUESTER_ID, invitedByPlatformRole: 'HQ_MANAGER' }
     )
     expect(result.success).toBe(true)
@@ -417,7 +398,7 @@ describe('ShopStaffService.list()', () => {
     const result = await service.list(SHOP_ID, {
       page: 2,
       limit: 50,
-      role: 'SHOP_STAFF',
+      role: 'VENDOR_EMPLOYEE',
       is_active: 'true',
     })
 
@@ -425,7 +406,7 @@ describe('ShopStaffService.list()', () => {
       shopId: SHOP_ID,
       page: 2,
       limit: 50,
-      role: 'SHOP_STAFF',
+      role: 'VENDOR_EMPLOYEE',
       is_active: 'true',
     })
     expect(result).toEqual({
@@ -583,7 +564,7 @@ describe('createShopStaffSchema — permissions and role validation', () => {
   const VALID_BASE = {
     vendor_id: SHOP_ID,
     user_id: TARGET_USER_ID,
-    role: 'SHOP_MANAGER',
+    role: 'VENDOR_EMPLOYEE',
   }
 
   it('lists exactly the canonical 37 Permission_Strings', () => {
@@ -593,12 +574,10 @@ describe('createShopStaffSchema — permissions and role validation', () => {
     expect(PERMISSION_ENUM).toContain('reports.global_view')
   })
 
-  it('lists exactly the 4 staff roles from Requirement 2.1', () => {
+  it('lists exactly the 2 staff roles from target structure', () => {
     expect(VALID_ROLES).toEqual([
-      'SHOP_ADMIN',
-      'SHOP_MANAGER',
-      'SHOP_STAFF',
-      'SHOP_VIEWER',
+      'VENDOR_OWNER',
+      'VENDOR_EMPLOYEE',
     ])
   })
 
@@ -648,7 +627,7 @@ describe('createShopStaffSchema — permissions and role validation', () => {
     expect(parsed.success).toBe(false)
   })
 
-  it.each(['SHOP_OWNER', 'OWNER', 'shop_admin', '', 'ADMIN'])(
+  it.each(['SHOP_OWNER', 'OWNER', 'shop_admin', '', 'ADMIN', 'SHOP_ADMIN', 'SHOP_MANAGER', 'SHOP_STAFF', 'SHOP_VIEWER'])(
     'rejects invalid role "%s"',
     (role) => {
       const parsed = createShopStaffSchema.safeParse({ ...VALID_BASE, role })
@@ -671,7 +650,7 @@ describe('createShopStaffSchema — permissions and role validation', () => {
       vendor_id: SHOP_ID,
       email: 'NewStaff@Example.com',
       name: 'New Staff',
-      role: 'SHOP_VIEWER',
+      role: 'VENDOR_EMPLOYEE',
       generate_temp_password: true,
     })
     expect(parsed.success).toBe(true)
@@ -685,7 +664,7 @@ describe('createShopStaffSchema — permissions and role validation', () => {
     const parsed = createShopStaffSchema.safeParse({
       vendor_id: SHOP_ID,
       name: 'New Staff',
-      role: 'SHOP_VIEWER',
+      role: 'VENDOR_EMPLOYEE',
     })
     expect(parsed.success).toBe(false)
   })
@@ -695,7 +674,7 @@ describe('createShopStaffSchema — permissions and role validation', () => {
       vendor_id: SHOP_ID,
       email: 'a@b.com',
       name: 'A B',
-      role: 'SHOP_VIEWER',
+      role: 'VENDOR_EMPLOYEE',
       generate_temp_password: false,
       password: 'aaaaaaaa', // letters only, no digit
     })

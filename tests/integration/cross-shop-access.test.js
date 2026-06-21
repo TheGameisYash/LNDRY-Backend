@@ -152,7 +152,7 @@ beforeAll(async () => {
 
   // Register shop-staff routes for the full HTTP flow test
   const { default: shopStaffRoutes } = await import(
-    '../../src/modules/shop-staff/shop-staff.routes.js'
+    '../../src/modules/vendor-employees/vendor-employees.routes.js'
   )
   await app.register(shopStaffRoutes, { prefix: '/api/v1/vendors/:shopId/staff' })
   await app.ready()

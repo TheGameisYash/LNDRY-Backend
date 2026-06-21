@@ -249,24 +249,22 @@ beforeEach(() => {
       }
     }
 
-    // ONBOARDING (vendors table matches)
-    if (sql.includes('INSERT INTO vendors')) {
+    // ONBOARDING (vendor_applications table matches)
+    if (sql.includes('INSERT INTO vendor_applications')) {
       applicationCreated = true
       return {
         rows: [{
           id: APPLICATION_ID,
           name: 'Quick Laundry',
-          slug: 'quick-laundry',
-          branch_code: 'VND-ABC',
+          owner_id: VENDOR_OWNER_ID,
           status: 'DRAFT',
-          created_by: VENDOR_OWNER_ID,
           created_at: new Date().toISOString()
         }]
       }
     }
 
-    // findByUserId
-    if (sql.includes('created_by = $1') && sql.includes('FROM vendors')) {
+    // findApplicationByOwnerId
+    if (sql.includes('owner_id = $1') && sql.includes('FROM vendor_applications')) {
       if (!applicationCreated) {
         return { rows: [] }
       }
@@ -274,12 +272,30 @@ beforeEach(() => {
         rows: [{
           id: APPLICATION_ID,
           name: 'Quick Laundry',
-          slug: 'quick-laundry',
-          branch_code: 'VND-ABC',
+          owner_id: VENDOR_OWNER_ID,
           status: 'DRAFT',
-          created_by: VENDOR_OWNER_ID,
-          delivery_radius_km: 5.00,
-          is_active: false,
+          requested_service_radius_km: 5.00,
+          approved_service_radius_km: 5.00,
+          created_at: new Date().toISOString()
+        }]
+      }
+    }
+
+    if (sql.includes('SELECT') && sql.includes('FROM vendor_applications') && sql.includes('id = $1')) {
+      return {
+        rows: [{
+          id: APPLICATION_ID,
+          name: 'Quick Laundry',
+          owner_id: VENDOR_OWNER_ID,
+          status: 'DRAFT',
+          requested_service_radius_km: 5.00,
+          approved_service_radius_km: 5.00,
+          address_line1: '123 Street',
+          city: 'Metropolis',
+          state: 'NY',
+          pincode: '10001',
+          lat: 12.9716,
+          lng: 77.5946,
           created_at: new Date().toISOString()
         }]
       }
@@ -287,27 +303,6 @@ beforeEach(() => {
 
     if (sql.includes('SELECT') && sql.includes('FROM vendors') && sql.includes('id = $1')) {
       const requestedId = params[0]
-      if (requestedId === APPLICATION_ID) {
-        return {
-          rows: [{
-            id: APPLICATION_ID,
-            name: 'Quick Laundry',
-            slug: 'quick-laundry',
-            branch_code: 'VND-ABC',
-            status: 'DRAFT',
-            created_by: VENDOR_OWNER_ID,
-            delivery_radius_km: 5.00,
-            address_line1: '123 Street',
-            city: 'Metropolis',
-            state: 'NY',
-            pincode: '10001',
-            lat: 12.9716,
-            lng: 77.5946,
-            is_active: false,
-            created_at: new Date().toISOString()
-          }]
-        }
-      }
       // default to approved active VENDOR_ID
       return {
         rows: [{
@@ -318,6 +313,7 @@ beforeEach(() => {
           status: 'APPROVED',
           created_by: VENDOR_OWNER_ID,
           delivery_radius_km: 5.00,
+          approved_service_radius_km: 5.00,
           address_line1: '123 Street',
           city: 'Metropolis',
           state: 'NY',
@@ -325,24 +321,31 @@ beforeEach(() => {
           lat: 12.9716,
           lng: 77.5946,
           is_active: true,
+          vendor_approved: true,
+          account_enabled: true,
+          marketplace_published: true,
           created_at: new Date().toISOString()
         }]
       }
     }
 
-    if (sql.includes('UPDATE vendors')) {
+    if (sql.includes('UPDATE vendor_applications')) {
       return {
         rows: [{
           id: APPLICATION_ID,
           status: 'WAITING_FOR_APPROVAL',
-          created_by: VENDOR_OWNER_ID,
-          is_active: false
+          owner_id: VENDOR_OWNER_ID
         }]
       }
     }
 
-    if (sql.includes('COUNT(*)') && sql.includes('vendor_documents')) {
-      return { rows: [{ count: '1' }] }
+    if (sql.includes('FROM vendor_documents')) {
+      return {
+        rows: [
+          { id: 'doc-1', document_type: 'owner_identity', file_url: 'private://1', status: 'APPROVED' },
+          { id: 'doc-2', document_type: 'shop_photo', file_url: 'private://2', status: 'APPROVED' }
+        ]
+      }
     }
 
     // validate-location (serviceable check)
@@ -351,17 +354,22 @@ beforeEach(() => {
     }
 
     // laundry categories list
-    if (sql.includes('laundry_categories') || sql.includes('categories')) {
+    if (sql.includes('laundry_categories') || sql.includes('service_categories') || sql.includes('categories')) {
       return {
         rows: [{ id: 'cat-1', name: 'Wash & Fold' }]
       }
     }
 
-    // quotes pricing selection
-    if (sql.includes('FROM garment_rates') || sql.includes('FROM vendor_services')) {
+    // quotes pricing selection and config check
+    if (sql.includes('vendor_service_rates') && sql.includes('vendor_services') && sql.includes('LIMIT 1')) {
+      return {
+        rows: [{ configured: 1 }]
+      }
+    }
+    if (sql.includes('vendor_service_rates') || sql.includes('FROM garment_rates') || sql.includes('FROM vendor_services') || sql.includes('garment_types')) {
       return {
         rows: [
-          { id: 'e6833b3a-aa11-477c-bc22-cf8535a289b1', name: 'Shirt', unit: 'piece', price: '5.00' }
+          { id: 'e6833b3a-aa11-477c-bc22-cf8535a289b1', name: 'Shirt', unit: 'piece', rate_paise: 500 }
         ]
       }
     }
@@ -372,6 +380,8 @@ beforeEach(() => {
         rows: [{
           id: 'quote-123',
           vendor_id: VENDOR_ID,
+          customer_id: CUSTOMER_USER_ID,
+          service_id: '861a7a0b-1133-4f93-bb5b-38d7890b1ea0',
           estimate_paise: 1000,
           expiry: new Date(Date.now() + 30 * 60000).toISOString()
         }]
@@ -381,7 +391,24 @@ beforeEach(() => {
     // Addresses
     if (sql.includes('FROM addresses')) {
       return {
-        rows: [{ id: 'addr-1', lat: 12.9716, lng: 77.5946 }]
+        rows: [{ id: 'addr-1', lat: 12.9716, lng: 77.5946, is_default: true }]
+      }
+    }
+
+    // Insert into quotes mock
+    if (sql.includes('INSERT INTO quotes')) {
+      return {
+        rows: [{
+          id: 'quote-123',
+          expires_at: new Date(Date.now() + 600000).toISOString()
+        }]
+      }
+    }
+
+    // Slot eligibility config check
+    if (sql.includes('vendor_slots') && sql.includes('LIMIT 1')) {
+      return {
+        rows: [{ configured: 1 }]
       }
     }
 

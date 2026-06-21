@@ -150,6 +150,27 @@ export class PaymentsService {
   }
 
   /**
+   * Release slot hold on payment failure helper
+   */
+  async _releaseSlotHold(orderDraftId) {
+    if (!orderDraftId) return
+    try {
+      const draftRes = await query('SELECT snapshot FROM order_drafts WHERE id = $1', [orderDraftId])
+      if (draftRes.rows.length > 0) {
+        const snapshot = draftRes.rows[0].snapshot
+        const snap = typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot
+        const quoteId = snap.quote?.quote_id || snap.quote?.id
+        if (quoteId) {
+          await query('DELETE FROM slot_holds WHERE quote_id = $1', [quoteId])
+          logger.info({ quoteId, orderDraftId }, 'Slot hold released due to payment failure')
+        }
+      }
+    } catch (err) {
+      logger.warn({ err: err.message, orderDraftId }, 'Failed to release slot hold on payment failure (non-critical)')
+    }
+  }
+
+  /**
    * Verify payment signature from Razorpay client-side callback
    */
   async verifyPayment(userId, body) {
@@ -180,9 +201,12 @@ export class PaymentsService {
 
         await this.repo.updatePayment(payment.id, { status: 'FAILED' })
         if (payment.orderId) {
-          await this.ordersRepo.updateStatus(payment.orderId, undefined, {
+          await this.ordersRepo.updateStatus(payment.orderId, 'PAYMENT_FAILED', {
             paymentStatus: 'FAILED',
           })
+        }
+        if (payment.orderDraftId) {
+          await this._releaseSlotHold(payment.orderDraftId)
         }
 
         return { success: false, message: 'Payment verification failed' }
@@ -218,15 +242,6 @@ export class PaymentsService {
         logger.warn({ err: err.message, orderId: payment.orderId }, 'Failed to queue auto-reject on verified payment')
       }
 
-      try {
-        const { CartRepository } = await import('../cart/cart.repository.js')
-        const cartRepo = new CartRepository()
-        await cartRepo.clearCart(userId)
-        await cartRepo.clearExtras(userId)
-      } catch (err) {
-        logger.warn({ err: err.message, userId }, 'Cart clear after payment verify failed (non-critical)')
-      }
-
       // Send order placed notification after confirmed payment
       try {
         const order = await this.ordersRepo.findByIdAndUser(payment.orderId, userId)
@@ -246,28 +261,8 @@ export class PaymentsService {
         logger.warn({ err: err.message, orderId: payment.orderId }, 'Order notification after payment verify failed (non-critical)')
       }
     }
-    try {
-      await orderQueue.add(
-        'auto-reject',
-        {
-          type: 'auto-reject',
-          orderId: payment.orderId,
-        },
-        {
-          jobId: `auto-reject-${payment.orderId}`,
-          delay: 15 * 60 * 1000,
-          removeOnComplete: true,
-        }
-      )
-    } catch (err) {
-      logger.warn({ err: err.message, orderId: payment.orderId }, 'Failed to queue auto-reject on verified payment')
-    }
 
-    // NOW clear the cart and send "Order placed" notification — only after
-    // payment is confirmed. This is the critical fix: previously the order
-    // service cleared cart and sent notification at order creation time,
-    // before payment verification, which caused false notifications and
-    // empty carts when Razorpay payment failed.
+    // Clear the cart - only after payment is confirmed.
     try {
       const { CartRepository } = await import('../cart/cart.repository.js')
       const cartRepo = new CartRepository()
@@ -277,27 +272,8 @@ export class PaymentsService {
       logger.warn({ err: err.message, userId }, 'Cart clear after payment verify failed (non-critical)')
     }
 
-    // Send order placed notification after confirmed payment
-    try {
-      const order = await this.ordersRepo.findByIdAndUser(payment.orderId, userId)
-      if (order) {
-        const { NotificationsRepository } = await import('../notifications/notifications.repository.js')
-        const { NotificationsService } = await import('../notifications/notifications.service.js')
-        const { buildCustomerOrderEventNotification } = await import('../notifications/customer-order-event.helper.js')
-        const notifService = new NotificationsService(new NotificationsRepository(), null)
-        await notifService.sendNotification(userId, buildCustomerOrderEventNotification({
-          orderId: order.id,
-          orderNumber: order.orderNumber || order.order_number,
-          timelineType: 'ORDER_PLACED',
-          status: 'CONFIRMED',
-        }))
-      }
-    } catch (err) {
-      logger.warn({ err: err.message, orderId: payment.orderId }, 'Order notification after payment verify failed (non-critical)')
-    }
-
     logger.info(
-      { paymentId: payment.id, razorpayPaymentId, orderId: payment.orderId },
+      { paymentId: payment.id, razorpayPaymentId: rzpPaymentId, orderId: payment.orderId },
       'Payment verified successfully'
     )
 
@@ -307,16 +283,25 @@ export class PaymentsService {
   /**
    * Handle Razorpay webhook events
    */
-  async handleWebhook(body, signature) {
+  async handleWebhook(rawBody, signature) {
     if (!env.RAZORPAY_WEBHOOK_SECRET) {
       logger.warn('Razorpay webhook secret not configured')
       return { success: false }
     }
 
+    let payloadString = rawBody
+    if (typeof rawBody !== 'string') {
+      if (Buffer.isBuffer(rawBody)) {
+        payloadString = rawBody.toString('utf8')
+      } else {
+        payloadString = JSON.stringify(rawBody)
+      }
+    }
+
     // Verify webhook signature
     const expectedSignature = crypto
       .createHmac('sha256', env.RAZORPAY_WEBHOOK_SECRET)
-      .update(JSON.stringify(body))
+      .update(payloadString)
       .digest('hex')
 
     if (expectedSignature !== signature) {
@@ -324,6 +309,7 @@ export class PaymentsService {
       return { success: false }
     }
 
+    const body = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody
     const event = body.event
     const payload = body.payload
 
@@ -373,9 +359,14 @@ export class PaymentsService {
           const payment = await this.repo.findByRazorpayOrderId(rzpOrderId)
           if (payment) {
             await this.repo.updatePayment(payment.id, { status: 'FAILED' })
-            await this.ordersRepo.updateStatus(payment.orderId, undefined, {
-              paymentStatus: 'FAILED',
-            })
+            if (payment.orderId) {
+              await this.ordersRepo.updateStatus(payment.orderId, 'PAYMENT_FAILED', {
+                paymentStatus: 'FAILED',
+              })
+            }
+            if (payment.orderDraftId) {
+              await this._releaseSlotHold(payment.orderDraftId)
+            }
             logger.info({ paymentId: payment.id }, 'Payment failed via webhook')
           }
         }

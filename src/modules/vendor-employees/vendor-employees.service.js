@@ -133,17 +133,13 @@ function makeServiceError(statusCode, code, message) {
 function allowedTargetRoles({ invitedByPlatformRole, invitedByRole }) {
   if (invitedByPlatformRole && HQ_ROLES.includes(invitedByPlatformRole)) {
     return new Set([
-      'SHOP_ADMIN',
-      'SHOP_MANAGER',
-      'SHOP_STAFF',
-      'SHOP_VIEWER',
+      'VENDOR_OWNER',
+      'VENDOR_EMPLOYEE',
     ])
   }
   switch (invitedByRole) {
-    case 'SHOP_ADMIN':
-      return new Set(['SHOP_MANAGER', 'SHOP_STAFF', 'SHOP_VIEWER'])
-    case 'SHOP_MANAGER':
-      return new Set(['SHOP_STAFF', 'SHOP_VIEWER'])
+    case 'VENDOR_OWNER':
+      return new Set(['VENDOR_EMPLOYEE'])
     default:
       return null
   }

@@ -22,8 +22,9 @@ export class SlotsController {
     const vendorId = request.body.vendor_id || request.body.vendorId
     const slotId = request.body.slot_id || request.body.slotId
     const date = request.body.date
+    const quoteId = request.body.quote_id || request.body.quoteId
     try {
-      const hold = await this.service.holdSlot(request.user.id, vendorId, slotId, date)
+      const hold = await this.service.holdSlot(request.user.id, vendorId, slotId, date, quoteId)
       return reply.code(201).send(success(hold, 'Slot held successfully'))
     } catch (err) {
       return reply.code(err.statusCode || 500).send(error(err.message || 'Failed to hold slot'))

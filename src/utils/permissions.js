@@ -290,6 +290,13 @@ export const SHOP_ROLE_DEFAULT_PERMISSIONS = Object.freeze({
       'shop_reports.view',
     ]),
   ),
+  VENDOR_OWNER: Object.freeze(new Set(SHOP_SCOPED_PERMISSIONS)),
+  VENDOR_EMPLOYEE: Object.freeze(
+    new Set([
+      'shop_orders.view',
+      'shop_orders.update_status',
+    ]),
+  ),
 })
 
 /**

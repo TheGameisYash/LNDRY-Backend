@@ -118,6 +118,7 @@ function makeShopRow(shopId, coords = {}) {
 describe('Task 23.5 — Rider auto-assignment uses shop coordinates', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockQuery.mockReset()
     mockClient.query.mockReset()
     mockClient.release.mockReset()
   })

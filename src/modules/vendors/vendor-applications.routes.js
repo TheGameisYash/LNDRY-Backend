@@ -15,8 +15,8 @@ export default async function vendorApplicationsRoutes(fastify) {
 
   // ─── Applications (Onboarding Wizard) ────────────────────
   
-  // POST /applications — Create draft application
-  fastify.post('/applications', {
+  // POST /applications or / — Create draft application
+  const createApplicationOpts = {
     preHandler: commonPreHandlers,
     schema: {
       tags: ['Vendor Onboarding'],
@@ -28,19 +28,23 @@ export default async function vendorApplicationsRoutes(fastify) {
         }
       }
     }
-  }, controller.createApplication.bind(controller))
+  }
+  fastify.post('/applications', createApplicationOpts, controller.createApplication.bind(controller))
+  fastify.post('/', createApplicationOpts, controller.createApplication.bind(controller))
 
-  // GET /applications/me — Get current application details
-  fastify.get('/applications/me', {
+  // GET /applications/me or /me — Get current application details
+  const getApplicationMeOpts = {
     preHandler: commonPreHandlers,
     schema: {
       tags: ['Vendor Onboarding'],
       summary: 'Get current onboarding application and missing steps'
     }
-  }, controller.getApplicationMe.bind(controller))
+  }
+  fastify.get('/applications/me', getApplicationMeOpts, controller.getApplicationMe.bind(controller))
+  fastify.get('/me', getApplicationMeOpts, controller.getApplicationMe.bind(controller))
 
-  // PATCH /applications/:id/owner — Update owner profile & contacts
-  fastify.patch('/applications/:id/owner', {
+  // PATCH /applications/:id/owner or /:id/owner — Update owner profile & contacts
+  const updateApplicationOwnerOpts = {
     preHandler: commonPreHandlers,
     schema: {
       tags: ['Vendor Onboarding'],
@@ -62,10 +66,12 @@ export default async function vendorApplicationsRoutes(fastify) {
         }
       }
     }
-  }, controller.updateApplicationOwner.bind(controller))
+  }
+  fastify.patch('/applications/:id/owner', updateApplicationOwnerOpts, controller.updateApplicationOwner.bind(controller))
+  fastify.patch('/:id/owner', updateApplicationOwnerOpts, controller.updateApplicationOwner.bind(controller))
 
-  // PATCH /applications/:id/business — Update business details (laundry info, description, hours)
-  fastify.patch('/applications/:id/business', {
+  // PATCH /applications/:id/business or /:id/business — Update business details (laundry info, description, hours)
+  const updateApplicationBusinessOpts = {
     preHandler: commonPreHandlers,
     schema: {
       tags: ['Vendor Onboarding'],
@@ -86,10 +92,12 @@ export default async function vendorApplicationsRoutes(fastify) {
         }
       }
     }
-  }, controller.updateApplicationBusiness.bind(controller))
+  }
+  fastify.patch('/applications/:id/business', updateApplicationBusinessOpts, controller.updateApplicationBusiness.bind(controller))
+  fastify.patch('/:id/business', updateApplicationBusinessOpts, controller.updateApplicationBusiness.bind(controller))
 
-  // PATCH /applications/:id/location — Update location details
-  fastify.patch('/applications/:id/location', {
+  // PATCH /applications/:id/location or /:id/location — Update location details
+  const updateApplicationLocationOpts = {
     preHandler: commonPreHandlers,
     schema: {
       tags: ['Vendor Onboarding'],
@@ -112,10 +120,12 @@ export default async function vendorApplicationsRoutes(fastify) {
         }
       }
     }
-  }, controller.updateApplicationLocation.bind(controller))
+  }
+  fastify.patch('/applications/:id/location', updateApplicationLocationOpts, controller.updateApplicationLocation.bind(controller))
+  fastify.patch('/:id/location', updateApplicationLocationOpts, controller.updateApplicationLocation.bind(controller))
 
-  // PATCH /applications/:id/radius — Update delivery radius
-  fastify.patch('/applications/:id/radius', {
+  // PATCH /applications/:id/radius or /:id/radius — Update delivery radius
+  const updateApplicationRadiusOpts = {
     preHandler: commonPreHandlers,
     schema: {
       tags: ['Vendor Onboarding'],
@@ -133,10 +143,12 @@ export default async function vendorApplicationsRoutes(fastify) {
         }
       }
     }
-  }, controller.updateApplicationRadius.bind(controller))
+  }
+  fastify.patch('/applications/:id/radius', updateApplicationRadiusOpts, controller.updateApplicationRadius.bind(controller))
+  fastify.patch('/:id/radius', updateApplicationRadiusOpts, controller.updateApplicationRadius.bind(controller))
 
-  // POST /applications/:id/documents — Upload document (multipart)
-  fastify.post('/applications/:id/documents', {
+  // POST /applications/:id/documents or /:id/documents — Upload document (multipart)
+  const uploadApplicationDocumentOpts = {
     preHandler: commonPreHandlers,
     schema: {
       tags: ['Vendor Onboarding'],
@@ -147,10 +159,12 @@ export default async function vendorApplicationsRoutes(fastify) {
         properties: { id: { type: 'string', format: 'uuid' } }
       }
     }
-  }, controller.uploadApplicationDocument.bind(controller))
+  }
+  fastify.post('/applications/:id/documents', uploadApplicationDocumentOpts, controller.uploadApplicationDocument.bind(controller))
+  fastify.post('/:id/documents', uploadApplicationDocumentOpts, controller.uploadApplicationDocument.bind(controller))
 
-  // DELETE /applications/:id/documents/:documentId — Delete document
-  fastify.delete('/applications/:id/documents/:documentId', {
+  // DELETE /applications/:id/documents/:documentId or /:id/documents/:documentId — Delete document
+  const deleteApplicationDocumentOpts = {
     preHandler: commonPreHandlers,
     schema: {
       tags: ['Vendor Onboarding'],
@@ -164,10 +178,12 @@ export default async function vendorApplicationsRoutes(fastify) {
         }
       }
     }
-  }, controller.deleteApplicationDocument.bind(controller))
+  }
+  fastify.delete('/applications/:id/documents/:documentId', deleteApplicationDocumentOpts, controller.deleteApplicationDocument.bind(controller))
+  fastify.delete('/:id/documents/:documentId', deleteApplicationDocumentOpts, controller.deleteApplicationDocument.bind(controller))
 
-  // POST /applications/:id/submit — Submit application for review
-  fastify.post('/applications/:id/submit', {
+  // POST /applications/:id/submit or /:id/submit — Submit application for review
+  const submitApplicationOpts = {
     preHandler: commonPreHandlers,
     schema: {
       tags: ['Vendor Onboarding'],
@@ -178,10 +194,12 @@ export default async function vendorApplicationsRoutes(fastify) {
         properties: { id: { type: 'string', format: 'uuid' } }
       }
     }
-  }, controller.submitApplication.bind(controller))
+  }
+  fastify.post('/applications/:id/submit', submitApplicationOpts, controller.submitApplication.bind(controller))
+  fastify.post('/:id/submit', submitApplicationOpts, controller.submitApplication.bind(controller))
 
-  // POST /applications/:id/resubmit — Resubmit correction
-  fastify.post('/applications/:id/resubmit', {
+  // POST /applications/:id/resubmit or /:id/resubmit — Resubmit correction
+  const resubmitApplicationOpts = {
     preHandler: commonPreHandlers,
     schema: {
       tags: ['Vendor Onboarding'],
@@ -192,7 +210,9 @@ export default async function vendorApplicationsRoutes(fastify) {
         properties: { id: { type: 'string', format: 'uuid' } }
       }
     }
-  }, controller.resubmitApplication.bind(controller))
+  }
+  fastify.post('/applications/:id/resubmit', resubmitApplicationOpts, controller.resubmitApplication.bind(controller))
+  fastify.post('/:id/resubmit', resubmitApplicationOpts, controller.resubmitApplication.bind(controller))
 
   // ─── Profile Management (Approved Vendors) ───────────────
 

@@ -49,7 +49,24 @@ export class SlotsService {
     })
   }
 
-  async holdSlot(userId, vendorId, slotId, bookingDate) {
+  async holdSlot(userId, vendorId, slotId, bookingDate, quoteId) {
+    if (!quoteId) {
+      throw { statusCode: 400, message: 'quote_id is required' }
+    }
+
+    // Validate quote ownership
+    const quoteRes = await query('SELECT customer_id, vendor_id FROM quotes WHERE id = $1', [quoteId])
+    if (quoteRes.rows.length === 0) {
+      throw { statusCode: 404, message: 'Quotation not found' }
+    }
+    const quote = quoteRes.rows[0]
+    if (quote.customer_id !== userId) {
+      throw { statusCode: 403, message: 'Forbidden - quote ownership validation failed' }
+    }
+    if (quote.vendor_id !== vendorId) {
+      throw { statusCode: 400, message: 'Vendor mismatch' }
+    }
+
     const client = await getClient()
     try {
       await client.query('BEGIN')
@@ -81,10 +98,10 @@ export class SlotsService {
 
       // 3. Create short-lived hold (10 min expiry)
       const { rows: hold } = await client.query(
-        `INSERT INTO slot_holds (vendor_id, slot_id, user_id, booking_date, expires_at)
-         VALUES ($1, $2, $3, $4, NOW() + INTERVAL '10 minutes')
+        `INSERT INTO slot_holds (vendor_id, slot_id, customer_id, user_id, quote_id, booking_date, expires_at)
+         VALUES ($1, $2, $3, $3, $4, $5, NOW() + INTERVAL '10 minutes')
          RETURNING id, expires_at`,
-        [vendorId, slotId, userId, bookingDate]
+        [vendorId, slotId, userId, quoteId, bookingDate]
       )
 
       await client.query('COMMIT')

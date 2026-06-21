@@ -108,7 +108,7 @@ export class DeliveryRepository {
              o.delivery_address, o.delivery_notes,
              o.items, o.estimated_delivery, o.created_at,
              u.name as customer_name, u.phone as customer_phone
-      FROM delivery_assignments da
+      FROM order_assignments da
       JOIN orders o ON o.id = da.order_id
       LEFT JOIN users u ON u.id = o.user_id
       LEFT JOIN rider_earnings re ON re.order_id = da.order_id AND re.rider_id = da.rider_id
@@ -136,7 +136,7 @@ export class DeliveryRepository {
               o.vendor_id,
               ru.name as rider_name, ru.phone as rider_phone,
               rp.current_lat as rider_lat, rp.current_lng as rider_lng
-       FROM delivery_assignments da
+       FROM order_assignments da
        JOIN orders o ON o.id = da.order_id
        LEFT JOIN users ru ON ru.id = da.rider_id
        LEFT JOIN rider_profiles rp ON rp.user_id = da.rider_id
@@ -156,7 +156,7 @@ export class DeliveryRepository {
        FROM orders o
        LEFT JOIN LATERAL (
          SELECT id, status, cancel_reason
-         FROM delivery_assignments
+         FROM order_assignments
          WHERE order_id = $1 AND rider_id = $2
          ORDER BY assigned_at DESC NULLS LAST, created_at DESC
          LIMIT 1
@@ -196,7 +196,7 @@ export class DeliveryRepository {
       }
 
       const { rows: [assignment] } = await client.query(
-        `UPDATE delivery_assignments
+        `UPDATE order_assignments
          SET status = 'ACCEPTED', accepted_at = NOW(), updated_at = NOW()
          WHERE id = $1
            AND order_id = $2
@@ -224,7 +224,7 @@ export class DeliveryRepository {
       )
 
       const { rows: cancelledOffers } = await client.query(
-        `UPDATE delivery_assignments
+        `UPDATE order_assignments
          SET status = 'CANCELLED',
              cancel_reason = 'Accepted by another rider',
              cancelled_at = NOW(),
@@ -256,7 +256,7 @@ export class DeliveryRepository {
       await client.query('BEGIN')
 
       const { rows: [assignment] } = await client.query(
-        `UPDATE delivery_assignments
+        `UPDATE order_assignments
          SET status = 'CANCELLED', cancel_reason = $2, cancelled_at = NOW(), updated_at = NOW()
          WHERE id = $1
            AND status = 'ASSIGNED'
@@ -276,7 +276,7 @@ export class DeliveryRepository {
            AND o.rider_id IS NULL
            AND NOT EXISTS (
              SELECT 1
-             FROM delivery_assignments da
+             FROM order_assignments da
              WHERE da.order_id = o.id
                AND da.status = ANY($3::text[])
            )
@@ -311,7 +311,7 @@ export class DeliveryRepository {
       )
 
       let { rows: [assignment] } = await client.query(
-        `UPDATE delivery_assignments
+        `UPDATE order_assignments
          SET status = 'IN_TRANSIT', picked_up_at = NOW(), updated_at = NOW()
          WHERE id = $1 AND status = 'ACCEPTED'
          RETURNING *`,
@@ -321,7 +321,7 @@ export class DeliveryRepository {
       if (!assignment) {
         const { rows: [snapshot] } = await client.query(
           `SELECT da.*, o.status as order_status
-           FROM delivery_assignments da
+           FROM order_assignments da
            JOIN orders o ON o.id = da.order_id
            WHERE da.id = $1
            LIMIT 1`,
@@ -383,7 +383,7 @@ export class DeliveryRepository {
       )
 
       let { rows: [assignment] } = await client.query(
-        `UPDATE delivery_assignments
+        `UPDATE order_assignments
          SET status = 'DELIVERED', delivered_at = NOW(), proof_photo_url = $2, updated_at = NOW()
          WHERE id = $1 AND status = 'IN_TRANSIT'
          RETURNING *`,
@@ -393,7 +393,7 @@ export class DeliveryRepository {
       if (!assignment) {
         const { rows: [snapshot] } = await client.query(
           `SELECT da.*, o.status as order_status
-           FROM delivery_assignments da
+           FROM order_assignments da
            JOIN orders o ON o.id = da.order_id
            WHERE da.id = $1
            LIMIT 1`,
@@ -431,7 +431,7 @@ export class DeliveryRepository {
       await client.query(
         `UPDATE rider_profiles
          SET total_deliveries = total_deliveries + 1, updated_at = NOW()
-         WHERE user_id = (SELECT rider_id FROM delivery_assignments WHERE id = $1)`,
+         WHERE user_id = (SELECT rider_id FROM order_assignments WHERE id = $1)`,
         [assignmentId]
       )
 
@@ -457,7 +457,7 @@ export class DeliveryRepository {
 
       if (assignmentEarning !== totalPayout) {
         await client.query(
-          `UPDATE delivery_assignments
+          `UPDATE order_assignments
            SET earnings = $2, updated_at = NOW()
            WHERE id = $1`,
           [assignmentId, totalPayout]
@@ -548,7 +548,7 @@ export class DeliveryRepository {
       await client.query('BEGIN')
 
       await client.query(
-        `UPDATE delivery_assignments
+        `UPDATE order_assignments
          SET proof_photo_url = $3, updated_at = NOW()
          WHERE order_id = $1 AND rider_id = $2
            AND status IN ('ACCEPTED', 'IN_TRANSIT', 'DELIVERED')`,
@@ -626,7 +626,7 @@ export class DeliveryRepository {
       await client.query('BEGIN')
 
       const { rows: [assignment] } = await client.query(
-        `UPDATE delivery_assignments
+        `UPDATE order_assignments
          SET status = 'PICKED_UP', picked_up_at = NOW(), updated_at = NOW()
          WHERE id = $1 AND status = 'ACCEPTED' AND rider_id = $2
          RETURNING *`,
@@ -666,7 +666,7 @@ export class DeliveryRepository {
               WHERE status = 'DELIVERED'
                 AND delivered_at::date = CURRENT_DATE
             )::int AS delivered_today
-         FROM delivery_assignments
+         FROM order_assignments
          WHERE rider_id = $1`,
         [riderId]
       ),
@@ -883,7 +883,7 @@ export class DeliveryRepository {
             COALESCE(re.tip_amount, 0) AS tip_amount
          FROM orders o
          LEFT JOIN users u ON u.id = o.user_id
-         LEFT JOIN delivery_assignments da ON da.order_id = o.id AND da.rider_id = $2
+         LEFT JOIN order_assignments da ON da.order_id = o.id AND da.rider_id = $2
          LEFT JOIN rider_earnings re ON re.order_id = o.id AND re.rider_id = $2
          WHERE o.id = $1
          ORDER BY da.delivered_at DESC NULLS LAST, da.updated_at DESC NULLS LAST
@@ -998,7 +998,7 @@ export class DeliveryRepository {
         `SELECT da.id as assignment_id, da.status, da.delivered_at,
                 COALESCE(NULLIF(da.earnings, 0), NULLIF(o.delivery_fee, 0), 25) as earnings,
                 o.id as order_id, o.order_number, o.total_amount, o.delivery_address
-         FROM delivery_assignments da
+         FROM order_assignments da
          JOIN orders o ON o.id = da.order_id
          WHERE da.rider_id = $1 AND da.status IN ('DELIVERED', 'CANCELLED')
          ORDER BY da.delivered_at DESC NULLS LAST
@@ -1006,7 +1006,7 @@ export class DeliveryRepository {
         [riderId, limit, offset]
       ),
       query(
-        `SELECT COUNT(*) FROM delivery_assignments
+        `SELECT COUNT(*) FROM order_assignments
          WHERE rider_id = $1 AND status IN ('DELIVERED', 'CANCELLED')`,
         [riderId]
       ),

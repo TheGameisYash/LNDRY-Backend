@@ -1,6 +1,6 @@
-import { CategoriesController } from './categories.controller.js'
-import { CategoriesService } from './categories.service.js'
-import { CategoriesRepository } from './categories.repository.js'
+import { CategoriesController } from './service-categories.controller.js'
+import { CategoriesService } from './service-categories.service.js'
+import { CategoriesRepository } from './service-categories.repository.js'
 import {
   listCategoriesSchema,
   getCategorySchema,
@@ -8,7 +8,7 @@ import {
   createCategorySchema,
   updateCategorySchema,
   deleteCategorySchema,
-} from './categories.schema.js'
+} from './service-categories.schema.js'
 
 /**
  * Categories routes plugin

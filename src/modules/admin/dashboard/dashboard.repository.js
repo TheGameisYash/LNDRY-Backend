@@ -258,7 +258,7 @@ export class DashboardRepository {
       // Count riders with active delivery assignments
       query(
         `SELECT COUNT(DISTINCT rider_id)::int AS on_delivery
-         FROM delivery_assignments
+         FROM order_assignments
          WHERE status IN ('ACCEPTED', 'PICKED_UP', 'IN_TRANSIT')`
       ),
     ])

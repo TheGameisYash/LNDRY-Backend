@@ -88,10 +88,10 @@ export class OrdersRepository {
     // work; new orders created via OrderSplitter populate both.
     for (const item of items) {
       await client.query(
-        `INSERT INTO order_items
-           (order_id, garment_rate_id, name, price, quantity, unit, total,
-            shop_product_id, vendor_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        `INSERT INTO order_lines
+           (order_id, garment_type_id, name, price, quantity, unit, total,
+            shop_product_id, vendor_id, estimated_quantity)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [
           rows[0].id,
           item.productId,
@@ -102,6 +102,7 @@ export class OrdersRepository {
           item.total,
           item.shopProductId || null,
           item.shopId || rows[0].vendor_id || null,
+          item.quantity,
         ]
       )
     }
@@ -490,9 +491,9 @@ export class OrdersRepository {
    */
   async getOrderItems(orderId) {
     const { rows } = await query(
-      `SELECT garment_rate_id, name, price, quantity, unit, total,
+      `SELECT garment_type_id AS garment_rate_id, name, price, quantity, unit, total,
               shop_product_id, vendor_id
-       FROM order_items
+       FROM order_lines
        WHERE order_id = $1`,
       [orderId]
     )

@@ -4,7 +4,7 @@ import {
   updateShopStaffSchema,
   listShopStaffQuerySchema,
   shopStaffIdParamSchema,
-} from './shop-staff.schema.js'
+} from './vendor-employees.schema.js'
 
 /**
  * Resolve vendor_id for shop-scoped operations (list/get/update/delete).

@@ -8,6 +8,21 @@ vi.mock('../../config/bullmq.js', () => ({
   closeBullMQ: vi.fn().mockResolvedValue(undefined),
 }))
 
+// Mock database to avoid real DB calls during transactions/queries
+const mockClient = {
+  query: vi.fn(),
+  release: vi.fn(),
+}
+vi.mock('../../config/database.js', () => ({
+  getClient: vi.fn(() => mockClient),
+  query: vi.fn(),
+}))
+
+// Mock state-machine to prevent real event log writes
+vi.mock('../../utils/state-machine.js', () => ({
+  recordOrderEvent: vi.fn().mockResolvedValue(undefined),
+}))
+
 import { DeliveryService } from './delivery.service.js'
 
 function createRepositoryMock() {
@@ -36,7 +51,11 @@ function createRepositoryMock() {
 }
 
 function createService(repository) {
-  const service = new DeliveryService(repository, {})
+  const otpService = {
+    generateOtp: vi.fn().mockResolvedValue('123456'),
+    verifyOtp: vi.fn().mockResolvedValue({ success: true }),
+  }
+  const service = new DeliveryService(repository, {}, { otpService })
   service._emitOrderUpdate = vi.fn()
   service._emitOrderExpired = vi.fn()
   service._queueNotification = vi.fn()
@@ -53,6 +72,16 @@ describe('DeliveryService assignment identifier fallback', () => {
   beforeEach(() => {
     repository = createRepositoryMock()
     service = createService(repository)
+    mockClient.query.mockReset()
+    mockClient.query.mockImplementation(async (sql, params) => {
+      if (sql.includes('SELECT status FROM orders')) {
+        return { rows: [{ status: 'GOING_FOR_PICKUP' }] }
+      }
+      if (sql.includes('UPDATE order_assignments')) {
+        return { rows: [{ id: 'assignment-3', status: 'PICKED_UP' }] }
+      }
+      return { rows: [] }
+    })
   })
 
   it('accepts an order when assignment only exposes id', async () => {
@@ -67,7 +96,9 @@ describe('DeliveryService assignment identifier fallback', () => {
       assignment: { id: 'assignment-1', status: 'ACCEPTED' },
       cancelledOffers: [],
     })
-    repository.storeDeliveryOtp.mockResolvedValue(undefined)
+    repository.getOrderAssignmentSnapshot.mockResolvedValue({
+      order_status: 'VENDOR_ACCEPTED',
+    })
 
     await service.acceptOrder('rider-1', 'order-1')
 
@@ -76,9 +107,9 @@ describe('DeliveryService assignment identifier fallback', () => {
       'order-1',
       'rider-1'
     )
-    expect(repository.storeDeliveryOtp).toHaveBeenCalledWith(
+    expect(service.otpService.generateOtp).toHaveBeenCalledWith(
       'order-1',
-      expect.any(String)
+      'PICKUP'
     )
   })
 
@@ -109,15 +140,17 @@ describe('DeliveryService assignment identifier fallback', () => {
       status: 'ACCEPTED',
       customer_id: 'customer-1',
       order_number: 'ORD-3',
+      order_status: 'PICKUP_OTP_VERIFIED',
     })
-    repository.markPickedUp.mockResolvedValue({ status: 'IN_TRANSIT' })
+    
+    mockClient.query
+      .mockResolvedValueOnce(undefined) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE orders
+      .mockResolvedValueOnce({ rows: [{ status: 'IN_TRANSIT' }] }) // UPDATE order_assignments
 
-    await service.markPickedUp('rider-1', 'order-3')
+    const result = await service.markPickedUp('rider-1', 'order-3')
 
-    expect(repository.markPickedUp).toHaveBeenCalledWith(
-      'assignment-3',
-      'order-3'
-    )
+    expect(result).toEqual({ status: 'IN_TRANSIT' })
   })
 
   it('treats repeated pickup as idempotent when snapshot is already in transit', async () => {
@@ -159,7 +192,7 @@ describe('DeliveryService assignment identifier fallback', () => {
       totalToday: 25,
     })
 
-    const result = await service.markDelivered('rider-1', 'order-4', '', 'proof-url')
+    const result = await service.markDelivered('rider-1', 'order-4', '123456', 'proof-url')
 
     expect(repository.markDelivered).toHaveBeenCalledWith(
       'assignment-4',
@@ -272,25 +305,28 @@ describe('DeliveryService assignment identifier fallback', () => {
         status: 'ACCEPTED',
         customer_id: 'customer-1',
         order_number: 'ORD-P1',
+        order_status: 'GOING_FOR_PICKUP',
       })
-      repository.verifyPickupOtp.mockResolvedValue(true)
-      repository.markAssignmentPickedUp.mockResolvedValue({ status: 'PICKED_UP' })
 
       const result = await service.verifyPickupOtp('rider-1', 'order-p1', '1234')
 
-      expect(repository.verifyPickupOtp).toHaveBeenCalledWith('order-p1', expect.any(String))
-      expect(repository.markAssignmentPickedUp).toHaveBeenCalledWith('assignment-p1', 'order-p1', 'rider-1')
-      expect(result).toEqual({ status: 'PICKED_UP' })
+      expect(service.otpService.verifyOtp).toHaveBeenCalledWith('order-p1', 'PICKUP', '1234')
+      expect(result).toEqual({ success: true })
     })
 
-    it('throws 400 when pickup OTP is invalid', async () => {
+    it('throws when pickup OTP is invalid', async () => {
       repository.getAssignmentByOrderAndRider.mockResolvedValue({
         id: 'assignment-p2',
         status: 'ACCEPTED',
         customer_id: 'customer-1',
         order_number: 'ORD-P2',
+        order_status: 'GOING_FOR_PICKUP',
       })
-      repository.verifyPickupOtp.mockResolvedValue(false)
+      service.otpService.verifyOtp.mockRejectedValueOnce({
+        statusCode: 400,
+        message: 'Invalid pickup OTP',
+        code: 'INVALID_OTP',
+      })
 
       await expect(service.verifyPickupOtp('rider-1', 'order-p2', '9999')).rejects.toEqual({
         statusCode: 400,
@@ -309,13 +345,12 @@ describe('DeliveryService assignment identifier fallback', () => {
         order_number: 'ORD-D1',
         proof_photo_url: 'proof-url',
       })
-      repository.verifyDeliveryOtp.mockResolvedValue(true)
       repository.markDelivered.mockResolvedValue({ status: 'DELIVERED' })
       repository.getDeliveryCompletionSummary.mockResolvedValue({ earnedAmount: 25 })
 
       const result = await service.verifyDeliveryOtp('rider-1', 'order-d1', '5678')
 
-      expect(repository.verifyDeliveryOtp).toHaveBeenCalledWith('order-d1', expect.any(String))
+      expect(service.otpService.verifyOtp).toHaveBeenCalledWith('order-d1', 'DELIVERY', '5678')
       expect(repository.markDelivered).toHaveBeenCalledWith('assignment-d1', 'order-d1', 'proof-url')
       expect(result.status).toBe('DELIVERED')
     })

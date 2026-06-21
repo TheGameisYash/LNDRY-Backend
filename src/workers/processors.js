@@ -10,7 +10,7 @@ import { ACTIVE_THEME_CACHE_KEY, LEGACY_TAB_CACHE_KEY } from '../modules/themes/
 import { emit as emitAudit } from '../utils/audit-log.js'
 
 const DEFAULT_RIDER_EARNING = 25
-const ASSIGNABLE_ORDER_STATUSES = ['CONFIRMED', 'PREPARING', 'PACKED']
+const ASSIGNABLE_ORDER_STATUSES = ['CONFIRMED', 'PREPARING', 'PACKED', 'VENDOR_ACCEPTED']
 const CLAIMED_ASSIGNMENT_STATUSES = ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT']
 const OPEN_ASSIGNMENT_STATUSES = ['ASSIGNED', ...CLAIMED_ASSIGNMENT_STATUSES]
 const RIDER_DECLINE_REASONS = new Set([
@@ -112,6 +112,7 @@ async function handleOrderStatusNotification({ orderId, userId, status, orderNum
     OUT_FOR_DELIVERY: { title: 'Out for Delivery 🚴', body: `Your order ${orderNumber} is on its way!` },
     DELIVERED: { title: 'Order Delivered ✅', body: `Your order ${orderNumber} has been delivered. Enjoy!` },
     CANCELLED: { title: 'Order Cancelled ❌', body: `Your order ${orderNumber} has been cancelled.` },
+    AUTO_REJECTED: { title: 'Order Auto-Rejected ❌', body: `Your order ${orderNumber} was auto-rejected as the vendor did not respond.` },
   }
 
   const msg = messages[status]
@@ -362,30 +363,81 @@ async function handleAutoReject({ orderId }) {
       [orderId]
     )
     const order = rows[0]
-    if (!order || order.status !== 'WAITING_FOR_VENDOR_CONFIRMATION') {
+    if (!order || order.status !== 'WAITING_VENDOR_CONFIRMATION') {
       await client.query('ROLLBACK')
       return { success: false, reason: 'ORDER_NOT_WAITING_OR_NOT_FOUND' }
     }
 
     await client.query(
-      `UPDATE orders SET status = 'CANCELLED', cancelled_reason = 'Auto-rejected: Vendor confirmation timeout', updated_at = NOW()
+      `UPDATE orders SET status = 'AUTO_REJECTED', payment_status = 'REFUNDED', cancelled_reason = 'Auto-rejected: Vendor confirmation timeout', updated_at = NOW()
        WHERE id = $1`,
       [orderId]
     )
 
-    // Restore stock
-    const { OrdersRepository } = await import('../modules/orders/orders.repository.js')
-    const repo = new OrdersRepository()
-    await repo.restoreStock(client, typeof order.items === 'string' ? JSON.parse(order.items) : order.items)
+    // Record order event in state machine logs
+    const { recordOrderEvent } = await import('../utils/state-machine.js')
+    await recordOrderEvent(client, {
+      orderId,
+      oldStatus: order.status,
+      newStatus: 'AUTO_REJECTED',
+      actorId: null,
+      actorRole: 'SYSTEM',
+      note: 'Auto-rejected: Vendor confirmation timeout'
+    })
+
+    // Refund payment
+    const { rows: paymentRows } = await client.query(
+      `SELECT id, amount, razorpay_payment_id FROM payments WHERE order_id = $1 AND status = 'PAID' LIMIT 1`,
+      [orderId]
+    )
+    if (paymentRows.length > 0) {
+      const payment = paymentRows[0]
+      const refundAmount = payment.amount
+      const reason = 'Auto-rejected: Vendor confirmation timeout'
+
+      let refundId = `ref_mock_${Math.random().toString(36).substring(2, 11)}`
+      let refundStatus = 'PROCESSED'
+
+      const { razorpay } = await import('../config/razorpay.js')
+      if (razorpay && payment.razorpay_payment_id) {
+        try {
+          const rzpRefund = await razorpay.payments.refund(payment.razorpay_payment_id, {
+            amount: Math.round(refundAmount * 100),
+            notes: { reason },
+          })
+          refundId = rzpRefund.id
+          refundStatus = 'PROCESSED'
+        } catch (rzpErr) {
+          logger.error({ err: rzpErr.message, orderId, paymentId: payment.id }, 'Razorpay refund failed during auto-reject')
+          refundStatus = 'FAILED'
+        }
+      }
+
+      await client.query(
+        `UPDATE payments
+         SET refund_id = $1, refund_amount = $2, refund_status = $3, status = 'REFUNDED', updated_at = NOW()
+         WHERE id = $4`,
+        [refundId, refundAmount, refundStatus, payment.id]
+      )
+    }
+
+    // Restore stock if any retail items existed
+    try {
+      const { OrdersRepository } = await import('../modules/orders/orders.repository.js')
+      const repo = new OrdersRepository()
+      await repo.restoreStock(client, typeof order.items === 'string' ? JSON.parse(order.items) : order.items)
+    } catch (stockErr) {
+      logger.warn({ err: stockErr.message, orderId }, 'Stock restore skipped during auto-reject')
+    }
 
     await client.query('COMMIT')
-    logger.info({ orderId }, 'Order auto-rejected')
+    logger.info({ orderId }, 'Order auto-rejected and refund completed')
 
     // Send customer notification
     await handleOrderStatusNotification({
       orderId: order.id,
       userId: order.user_id,
-      status: 'CANCELLED',
+      status: 'AUTO_REJECTED',
       orderNumber: order.order_number,
     })
 
@@ -564,35 +616,43 @@ async function handleAutoAssign({ orderId, source = 'SYSTEM' }) {
     return { assigned: false, reason: 'SHOP_COORDS_MISSING' }
   }
 
-  // Task 12.2: Select riders with status AVAILABLE, is_active=true, no non-terminal assignment
-  const { rows: candidateRiders } = await query(
-    `SELECT rp.user_id, rp.current_lat, rp.current_lng, rp.last_active_at
-     FROM rider_profiles rp
-     JOIN users u ON u.id = rp.user_id
-     WHERE rp.is_approved = true
-       AND rp.is_online = true
+  // LNDRY Workload-Based Employee Selection:
+  // Lookup active same-vendor employees (role = 'VENDOR_EMPLOYEE') with their active workload.
+  const { rows: candidateEmployees } = await query(
+    `SELECT ve.user_id,
+            rp.current_lat, rp.current_lng,
+            COALESCE(workload.count, 0)::int AS active_workload
+     FROM vendor_employees ve
+     JOIN users u ON u.id = ve.user_id
+     LEFT JOIN rider_profiles rp ON rp.user_id = ve.user_id
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS count
+       FROM order_assignments oa
+       WHERE oa.rider_id = ve.user_id
+         AND oa.status IN ('ASSIGNED', 'ACCEPTED', 'IN_TRANSIT')
+     ) workload ON true
+     WHERE ve.vendor_id = $1
+       AND ve.role = 'VENDOR_EMPLOYEE'
+       AND ve.is_active = true
+       AND ve.deleted_at IS NULL
        AND u.is_active = true
-       AND NOT EXISTS (
-         SELECT 1 FROM delivery_assignments da
-         WHERE da.rider_id = rp.user_id
-           AND da.status IN ('ASSIGNED', 'ACCEPTED', 'IN_TRANSIT')
-       )
-     ORDER BY rp.last_active_at ASC NULLS LAST
-     LIMIT 10000`
+     ORDER BY active_workload ASC, ve.created_at ASC
+     LIMIT 10000`,
+    [order.vendor_id]
   )
 
-  if (!candidateRiders.length) {
+  if (!candidateEmployees.length) {
     return { assigned: false, reason: 'NO_AVAILABLE_RIDERS' }
   }
 
   const candidatesWithDistance = []
 
-  for (const rider of candidateRiders) {
-    let lat = toNumber(rider.current_lat)
-    let lng = toNumber(rider.current_lng)
+  for (const employee of candidateEmployees) {
+    let lat = toNumber(employee.current_lat)
+    let lng = toNumber(employee.current_lng)
 
     try {
-      const cached = await redis.get(`rider:location:${rider.user_id}`)
+      const cached = await redis.get(`rider:location:${employee.user_id}`)
       if (cached) {
         const parsed = JSON.parse(cached)
         lat = toNumber(parsed.lat, lat)
@@ -608,26 +668,27 @@ async function handleAutoAssign({ orderId, source = 'SYSTEM' }) {
       if (Number.isFinite(resolvedDistance)) {
         distance = resolvedDistance
       }
-    } else {
-      logger.debug(
-        { orderId, riderId: rider.user_id },
-        'Offering order without rider distance: rider coordinates unavailable'
-      )
     }
 
     candidatesWithDistance.push({
-      riderId: rider.user_id,
+      riderId: employee.user_id,
       distanceKm: distance,
+      activeWorkload: employee.active_workload
     })
   }
 
+  // Workload is primary sort key, distance is secondary
   candidatesWithDistance.sort((a, b) => {
+    if (a.activeWorkload !== b.activeWorkload) {
+      return a.activeWorkload - b.activeWorkload
+    }
     const aDistance = Number.isFinite(a.distanceKm) ? a.distanceKm : Number.POSITIVE_INFINITY
     const bDistance = Number.isFinite(b.distanceKm) ? b.distanceKm : Number.POSITIVE_INFINITY
     return aDistance - bDistance
   })
 
-  const selectedCandidates = candidatesWithDistance
+  // Assign to the single employee with the lowest active work count
+  const selectedCandidates = candidatesWithDistance.slice(0, 1)
 
   if (!selectedCandidates.length) {
     return { assigned: false, reason: 'NO_AVAILABLE_RIDERS' }
@@ -660,7 +721,7 @@ async function handleAutoAssign({ orderId, source = 'SYSTEM' }) {
 
     const { rows: existingAssignments } = await client.query(
       `SELECT id, rider_id, status, cancel_reason, earnings, distance_km, assigned_at, created_at
-       FROM delivery_assignments
+       FROM order_assignments
        WHERE order_id = $1
        ORDER BY assigned_at DESC NULLS LAST, created_at DESC`,
       [orderId]
@@ -695,7 +756,7 @@ async function handleAutoAssign({ orderId, source = 'SYSTEM' }) {
 
       if (existing && canReopenCancelledOffer(existing.cancel_reason)) {
         const reopened = await client.query(
-          `UPDATE delivery_assignments
+          `UPDATE order_assignments
            SET status = 'ASSIGNED',
                assigned_at = NOW(),
                accepted_at = NULL,
@@ -715,7 +776,7 @@ async function handleAutoAssign({ orderId, source = 'SYSTEM' }) {
         assignmentRows = reopened.rows
       } else if (!existing) {
         const inserted = await client.query(
-          `INSERT INTO delivery_assignments (
+          `INSERT INTO order_assignments (
             order_id,
             rider_id,
             status,
@@ -726,7 +787,7 @@ async function handleAutoAssign({ orderId, source = 'SYSTEM' }) {
            SELECT $1, $2, 'ASSIGNED', NOW(), $3, $4
            WHERE NOT EXISTS (
              SELECT 1
-             FROM delivery_assignments da
+             FROM order_assignments da
              WHERE da.order_id = $1
                AND da.rider_id = $2
                AND da.status = ANY($5::text[])
@@ -744,6 +805,33 @@ async function handleAutoAssign({ orderId, source = 'SYSTEM' }) {
           ...inserted,
           distanceKm: toNumber(inserted.distance_km, candidate.distanceKm),
         })
+
+        // Transition order status in database
+        let nextStatus = null
+        if (lockedOrder.status === 'VENDOR_ACCEPTED') {
+          nextStatus = 'PICKUP_ASSIGNED'
+        } else if (lockedOrder.status === 'PACKED') {
+          nextStatus = 'DELIVERY_ASSIGNED'
+        }
+
+        if (nextStatus) {
+          await client.query(
+            `UPDATE orders
+             SET status = $1, updated_at = NOW()
+             WHERE id = $2`,
+            [nextStatus, orderId]
+          )
+          
+          const { recordOrderEvent } = await import('../utils/state-machine.js')
+          await recordOrderEvent(client, {
+            orderId,
+            oldStatus: lockedOrder.status,
+            newStatus: nextStatus,
+            actorId: null,
+            actorRole: 'SYSTEM',
+            note: 'Auto-assigned employee to order'
+          })
+        }
       }
     }
 
@@ -853,7 +941,7 @@ async function shouldRequeueOrder(orderId) {
        AND o.rider_id IS NULL
        AND NOT EXISTS (
          SELECT 1
-         FROM delivery_assignments da
+         FROM order_assignments da
          WHERE da.order_id = o.id
            AND da.status = ANY($2::text[])
        )

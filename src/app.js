@@ -93,9 +93,9 @@ export const buildApp = async () => {
     prefix: '/api/v1/users',
   })
 
-  // Customer — dedicated customer profile routes
-  await app.register(import('./modules/customer/customer.routes.js'), {
-    prefix: '/api/v1/customer',
+  // Customers — dedicated customer profile routes
+  await app.register(import('./modules/customers/customers.routes.js'), {
+    prefix: '/api/v1/customers',
   })
 
   // Devices — FCM token registration
@@ -103,19 +103,22 @@ export const buildApp = async () => {
     prefix: '/api/v1/devices',
   })
 
-  // Categories — fully implemented
-  await app.register(import('./modules/categories/categories.routes.js'), {
-    prefix: '/api/v1/categories',
+  // Service Categories — fully implemented
+  await app.register(import('./modules/service-categories/service-categories.routes.js'), {
+    prefix: '/api/v1/service-categories',
   })
-  await app.register(import('./modules/categories/categories.routes.js'), {
+  await app.register(import('./modules/service-categories/service-categories.routes.js'), {
     prefix: '/api/v1/laundry/categories',
   })
 
-  // Products — fully implemented
-  await app.register(import('./modules/products/products.routes.js'), {
+  // Garment Types — fully implemented
+  await app.register(import('./modules/garment-types/garment-types.routes.js'), {
+    prefix: '/api/v1/garment-types',
+  })
+  await app.register(import('./modules/garment-types/garment-types.routes.js'), {
     prefix: '/api/v1/garment_rates',
   })
-  await app.register(import('./modules/products/products.routes.js'), {
+  await app.register(import('./modules/garment-types/garment-types.routes.js'), {
     prefix: '/api/v1/products',
   })
 
@@ -135,7 +138,7 @@ export const buildApp = async () => {
   // where it constructs product URLs as /api/v1/api/v1/garment_rates/:id instead
   // of /api/v1/garment_rates/:id. This alias transparently handles those requests
   // so garment_rates load correctly without requiring a mobile app release.
-  await app.register(import('./modules/products/products.routes.js'), {
+  await app.register(import('./modules/garment-types/garment-types.routes.js'), {
     prefix: '/api/v1/api/v1/garment_rates',
   })
 
@@ -145,9 +148,9 @@ export const buildApp = async () => {
   })
 
   // Cart — fully implemented
-  await app.register(import('./modules/cart/cart.routes.js'), {
-    prefix: '/api/v1/cart',
-  })
+  // await app.register(import('./modules/cart/cart.routes.js'), {
+  //   prefix: '/api/v1/cart',
+  // })
 
   // Orders — fully implemented
   await app.register(import('./modules/orders/orders.routes.js'), {
@@ -160,14 +163,14 @@ export const buildApp = async () => {
   })
 
   // Wallet — fully implemented
-  await app.register(import('./modules/wallet/wallet.routes.js'), {
-    prefix: '/api/v1/wallet',
-  })
+  // await app.register(import('./modules/wallet/wallet.routes.js'), {
+  //   prefix: '/api/v1/wallet',
+  // })
 
   // Coupons — fully implemented
-  await app.register(import('./modules/coupons/coupons.routes.js'), {
-    prefix: '/api/v1/coupons',
-  })
+  // await app.register(import('./modules/coupons/coupons.routes.js'), {
+  //   prefix: '/api/v1/coupons',
+  // })
 
   // Addresses — fully implemented
   await app.register(import('./modules/addresses/addresses.routes.js'), {
@@ -195,9 +198,9 @@ export const buildApp = async () => {
   })
 
   // Wishlist — fully implemented
-  await app.register(import('./modules/wishlist/wishlist.routes.js'), {
-    prefix: '/api/v1/wishlist',
-  })
+  // await app.register(import('./modules/wishlist/wishlist.routes.js'), {
+  //   prefix: '/api/v1/wishlist',
+  // })
 
   // Reviews — fully implemented
   await app.register(import('./modules/reviews/reviews.routes.js'), {
@@ -205,12 +208,17 @@ export const buildApp = async () => {
   })
 
   // Delivery — fully implemented (Disabled per requirements)
-  // await app.register(import('./modules/delivery/delivery.routes.js'), {
-  //   prefix: '/api/v1/delivery',
-  // })
+  await app.register(import('./modules/delivery/delivery.routes.js'), {
+    prefix: '/api/v1/delivery',
+  })
 
-  // Slots — pickup slot capacity holds
-  await app.register(import('./modules/slots/slots.routes.js'), {
+  // Vendor Orders — vendor-side order management (accept/reject, processing, reconciliation)
+  await app.register(import('./modules/vendor-orders/vendor-orders.routes.js'), {
+    prefix: '/api/v1/vendor-orders',
+  })
+
+  // Pickup Slots — slot capacity holds and availability
+  await app.register(import('./modules/pickup-slots/pickup-slots.routes.js'), {
     prefix: '/api/v1',
   })
 
@@ -220,6 +228,9 @@ export const buildApp = async () => {
   })
 
   // Vendor applications & profiles onboarding (Section 8)
+  await app.register(import('./modules/vendors/vendor-applications.routes.js'), {
+    prefix: '/api/v1/vendor-applications',
+  })
   await app.register(import('./modules/vendors/vendor-applications.routes.js'), {
     prefix: '/api/v1/vendor',
   })
@@ -252,7 +263,7 @@ export const buildApp = async () => {
 
 
   // Shop Staff — role-based access management
-  await app.register(import('./modules/shop-staff/shop-staff.routes.js'), {
+  await app.register(import('./modules/vendor-employees/vendor-employees.routes.js'), {
     prefix: '/api/v1/shop-staff',
   })
 
@@ -262,14 +273,14 @@ export const buildApp = async () => {
   // layer. The controller's resolveShopId() prefers `request.params.shopId`
   // when present, so all role-check + scope semantics stay identical to the
   // /shop-staff prefix; this is a pure URL alias, not a behavioural fork.
-  await app.register(import('./modules/shop-staff/shop-staff.routes.js'), {
+  await app.register(import('./modules/vendor-employees/vendor-employees.routes.js'), {
     prefix: '/api/v1/vendors/:shopId/staff',
   })
 
   // Shop Products — per-shop inventory and pricing
-  await app.register(import('./modules/shop-garment_rates/shop-garment_rates.routes.js'), {
-    prefix: '/api/v1/shop-garment_rates',
-  })
+  // await app.register(import('./modules/shop-garment_rates/shop-garment_rates.routes.js'), {
+  //   prefix: '/api/v1/shop-garment_rates',
+  // })
 
   // Shop Products — nested per-shop write surface (R23.8, R23.12)
   // adjust-stock + bulk-price-update mounted at /api/v1/vendors/:shopId/garment_rates
@@ -277,61 +288,61 @@ export const buildApp = async () => {
   // separate URL rewrite layer (design §6.4). Same controller and service
   // as the /api/v1/shop-garment_rates mount; permission gating lives on each
   // route via requirePermission().
-  {
-    const { shopProductsNestedRoutes, shopStockMovementsRoutes, shopProductsAdminRoutes } =
-      await import('./modules/shop-garment_rates/shop-garment_rates.routes.js')
-    await app.register(shopProductsNestedRoutes, {
-      prefix: '/api/v1/vendors/:shopId/garment_rates',
-    })
-    // Stock-movements ledger reader (R23.5)
-    await app.register(shopStockMovementsRoutes, {
-      prefix: '/api/v1/vendors/:shopId/stock-movements',
-    })
-    // HQ-only admin approve/reject (R23.10, R23.11) — feature-flagged
-    await app.register(shopProductsAdminRoutes, {
-      prefix: '/api/v1/admin/shop-garment_rates',
-    })
-  }
+  // {
+  //   const { shopProductsNestedRoutes, shopStockMovementsRoutes, shopProductsAdminRoutes } =
+  //     await import('./modules/shop-garment_rates/shop-garment_rates.routes.js')
+  //   await app.register(shopProductsNestedRoutes, {
+  //     prefix: '/api/v1/vendors/:shopId/garment_rates',
+  //   })
+  //   // Stock-movements ledger reader (R23.5)
+  //   // await app.register(shopStockMovementsRoutes, {
+  //   //   prefix: '/api/v1/vendors/:shopId/stock-movements',
+  //   // })
+  //   // HQ-only admin approve/reject (R23.10, R23.11) — feature-flagged
+  //   await app.register(shopProductsAdminRoutes, {
+  //     prefix: '/api/v1/admin/shop-garment_rates',
+  //   })
+  // }
 
   // Shop Orders — store-scoped order operations (multi-vendor R22)
-  await app.register(import('./modules/shop-orders/routes.js'), {
-    prefix: '/api/v1/shop-orders',
-  })
+  // await app.register(import('./modules/shop-orders/routes.js'), {
+  //   prefix: '/api/v1/shop-orders',
+  // })
 
   // Shop Transactions — read-only append-only ledger
   // (write side is exposed as LedgerWriteService for orders/refunds/payouts)
-  await app.register(
-    import('./modules/shop-transactions/shop-transactions.routes.js'),
-    {
-      prefix: '/api/v1/shop-transactions',
-    }
-  )
+  // await app.register(
+  //   import('./modules/shop-transactions/shop-transactions.routes.js'),
+  //   {
+  //     prefix: '/api/v1/shop-transactions',
+  //   }
+  // )
 
   // Product Families — option grouping for multi-option garment_rates
-  await app.register(import('./modules/product-families/product-families.routes.js'), {
-    prefix: '/api/v1/admin/product-families',
-  })
+  // await app.register(import('./modules/product-families/product-families.routes.js'), {
+  //   prefix: '/api/v1/admin/product-families',
+  // })
 
   // Allocation — user-shop allocation (pincode + haversine)
-  await app.register(import('./modules/allocation/allocation.routes.js'), {
-    prefix: '/api/v1/allocation',
-  })
+  // await app.register(import('./modules/allocation/allocation.routes.js'), {
+  //   prefix: '/api/v1/allocation',
+  // })
 
   // Shop Financials — read-only paginated financials per period
-  await app.register(
-    import('./modules/shop-financials/shop-financials.routes.js'),
-    {
-      prefix: '/api/v1/shop-financials',
-    }
-  )
+  // await app.register(
+  //   import('./modules/shop-financials/shop-financials.routes.js'),
+  //   {
+  //     prefix: '/api/v1/shop-financials',
+  //   }
+  // )
 
   // Shop Finance — store-scoped finance endpoints (task 8.8)
-  await app.register(
-    import('./modules/shop-finance/routes.js'),
-    {
-      prefix: '/api/v1/shop-finance',
-    }
-  )
+  // await app.register(
+  //   import('./modules/shop-finance/routes.js'),
+  //   {
+  //     prefix: '/api/v1/shop-finance',
+  //   }
+  // )
 
   // Admin Finance — HQ-scoped finance endpoints (task 8.9)
   await app.register(
@@ -343,18 +354,18 @@ export const buildApp = async () => {
 
   // Bulk Orders — large multi-vendor scheduled-delivery orders
   // (registered after shop-financials; scheduled-orders comes online in 10.2)
-  await app.register(import('./modules/bulk-orders/bulk-orders.routes.js'), {
-    prefix: '/api/v1/bulk-orders',
-  })
+  // await app.register(import('./modules/bulk-orders/bulk-orders.routes.js'), {
+  //   prefix: '/api/v1/bulk-orders',
+  // })
 
   // Scheduled Orders — customer-side future / recurring orders (task 10.2)
   // (Worker that fires the orders at scheduled_for lives in task 10.3.)
-  await app.register(
-    import('./modules/scheduled-orders/scheduled-orders.routes.js'),
-    {
-      prefix: '/api/v1/scheduled-orders',
-    }
-  )
+  // await app.register(
+  //   import('./modules/scheduled-orders/scheduled-orders.routes.js'),
+  //   {
+  //     prefix: '/api/v1/scheduled-orders',
+  //   }
+  // )
 
   // Audit Logs — read-only endpoints (tasks 10.2, 10.3)
   {
@@ -394,14 +405,14 @@ export const buildApp = async () => {
   // ─── CART ENHANCEMENT MODULES ──────────────────────────
 
   // Tip Presets (public)
-  await app.register(import('./modules/tip-presets/tip-presets.routes.js'), {
-    prefix: '/api/v1/tip-presets',
-  })
-
-  // Payment Offers (public)
-  await app.register(import('./modules/payment-offers/payment-offers.routes.js'), {
-    prefix: '/api/v1/payment-offers',
-  })
+  // await app.register(import('./modules/tip-presets/tip-presets.routes.js'), {
+  //   prefix: '/api/v1/tip-presets',
+  // })
+  // 
+  // // Payment Offers (public)
+  // await app.register(import('./modules/payment-offers/payment-offers.routes.js'), {
+  //   prefix: '/api/v1/payment-offers',
+  // })
 
   // Fee Config (admin) — legacy row-per-type config (kept for backward compat)
   await app.register(import('./modules/fee-config/fee-config.routes.js'), {
@@ -414,16 +425,16 @@ export const buildApp = async () => {
   })
 
   // Tip Presets (admin)
-  const { adminTipPresetsRoutes } = await import('./modules/tip-presets/tip-presets.routes.js')
-  await app.register(adminTipPresetsRoutes, {
-    prefix: '/api/v1/admin/tip-presets',
-  })
-
-  // Payment Offers (admin)
-  const { adminPaymentOffersRoutes } = await import('./modules/payment-offers/payment-offers.routes.js')
-  await app.register(adminPaymentOffersRoutes, {
-    prefix: '/api/v1/admin/payment-offers',
-  })
+  // const { adminTipPresetsRoutes } = await import('./modules/tip-presets/tip-presets.routes.js')
+  // await app.register(adminTipPresetsRoutes, {
+  //   prefix: '/api/v1/admin/tip-presets',
+  // })
+  // 
+  // // Payment Offers (admin)
+  // const { adminPaymentOffersRoutes } = await import('./modules/payment-offers/payment-offers.routes.js')
+  // await app.register(adminPaymentOffersRoutes, {
+  //   prefix: '/api/v1/admin/payment-offers',
+  // })
 
   // ─── RAZORPAY WEBHOOK (outside /api/v1 — no auth, no rate-limit) ──
   await app.register(async function razorpayWebhook(fastify) {

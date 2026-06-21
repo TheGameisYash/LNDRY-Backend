@@ -1,7 +1,7 @@
 import { query } from '../../config/database.js'
 import { success, error } from '../../utils/apiResponse.js'
-import { CategoriesRepository } from '../categories/categories.repository.js'
-import { CategoriesService } from '../categories/categories.service.js'
+import { CategoriesRepository } from '../service-categories/service-categories.repository.js'
+import { CategoriesService } from '../service-categories/service-categories.service.js'
 
 export default async function discoveryRoutes(fastify) {
   const categoriesRepo = new CategoriesRepository()
@@ -22,6 +22,25 @@ export default async function discoveryRoutes(fastify) {
     } catch {
       /* anonymous fallback */
     }
+  }
+
+  // Helper to construct eligibility WHERE conditions
+  const getEligibilityConditions = () => {
+    return [
+      'v.vendor_approved = true',
+      'v.account_enabled = true',
+      'v.marketplace_published = true',
+      'v.deleted_at IS NULL',
+      `EXISTS (
+        SELECT 1 FROM vendor_services vs 
+        JOIN vendor_service_rates vsr ON vs.id = vsr.vendor_service_id 
+        WHERE vs.vendor_id = v.id AND vsr.is_active = true AND vs.deleted_at IS NULL
+      )`,
+      `EXISTS (
+        SELECT 1 FROM vendor_slots sl 
+        WHERE sl.vendor_id = v.id AND sl.is_active = true
+      )`
+    ]
   }
 
   // 1. GET /home -> Address-aware dashboard (Categories, nearby vendors, active order, history)
@@ -75,9 +94,21 @@ export default async function discoveryRoutes(fastify) {
       previousOrders = prevOrdRes.rows
 
       if (defaultAddress && defaultAddress.lat && defaultAddress.lng) {
-        // Query allocated/nearby vendors based on Haversine & default address coords
         const lat = parseFloat(defaultAddress.lat)
         const lng = parseFloat(defaultAddress.lng)
+
+        // Query allocated/nearby vendors based on Haversine, visibility, configs, and proximity radius
+        const conditions = getEligibilityConditions()
+        conditions.push(
+          `(6371 * acos(
+            LEAST(1.0, GREATEST(-1.0,
+              cos(radians($1::float8)) * cos(radians(v.lat::float8))
+                * cos(radians(v.lng::float8) - radians($2::float8))
+                + sin(radians($1::float8)) * sin(radians(v.lat::float8))
+            ))
+          )) <= v.approved_service_radius_km`
+        )
+
         const vendorsRes = await query(
           `SELECT v.id, v.name, v.slug, v.description, v.logo_url, v.banner_url,
                   v.address_line1, v.city, v.lat, v.lng, v.operating_hours,
@@ -88,36 +119,16 @@ export default async function discoveryRoutes(fastify) {
                         + sin(radians($1::float8)) * sin(radians(v.lat::float8))
                     ))
                   ))::numeric(7,2) AS distance_km,
-                  v.delivery_radius_km,
+                  v.approved_service_radius_km,
                   COALESCE((SELECT AVG(vendor_rating) FROM reviews r WHERE r.vendor_id = v.id AND r.deleted_at IS NULL), 5.0)::numeric(2,1) AS rating
              FROM vendors v
-            WHERE v.is_active = true
-              AND v.status = 'APPROVED'
-              AND v.deleted_at IS NULL
+            WHERE ${conditions.join(' AND ')}
             ORDER BY distance_km ASC NULLS LAST
             LIMIT 10`,
           [lat, lng]
         )
         nearbyVendors = vendorsRes.rows
       }
-    }
-
-    if (nearbyVendors.length === 0) {
-      // Fallback: list active approved vendors
-      const fallbackRes = await query(
-        `SELECT v.id, v.name, v.slug, v.description, v.logo_url, v.banner_url,
-                v.address_line1, v.city, v.lat, v.lng, v.operating_hours,
-                NULL::numeric(7,2) AS distance_km,
-                v.delivery_radius_km,
-                COALESCE((SELECT AVG(vendor_rating) FROM reviews r WHERE r.vendor_id = v.id AND r.deleted_at IS NULL), 5.0)::numeric(2,1) AS rating
-           FROM vendors v
-          WHERE v.is_active = true
-            AND v.status = 'APPROVED'
-            AND v.deleted_at IS NULL
-          ORDER BY v.created_at DESC
-          LIMIT 10`
-      )
-      nearbyVendors = fallbackRes.rows
     }
 
     return reply.code(200).send(success({
@@ -155,47 +166,58 @@ export default async function discoveryRoutes(fastify) {
     const { lat, lng, category_id, garment_type_id, date, slot, sort, page = 1, limit = 20 } = request.query
     const offset = (page - 1) * limit
 
-    const params = []
-    let pIdx = 1
-    let distanceSelect = 'NULL::numeric(7,2) AS distance_km'
-    let distanceWhere = ''
+    let userLat = lat
+    let userLng = lng
 
-    if (lat && lng) {
-      params.push(lat, lng)
-      distanceSelect = `(6371 * acos(
-        LEAST(1.0, GREATEST(-1.0,
-          cos(radians($1::float8)) * cos(radians(v.lat::float8))
-            * cos(radians(v.lng::float8) - radians($2::float8))
-            + sin(radians($1::float8)) * sin(radians(v.lat::float8))
-        ))
-      ))::numeric(7,2) AS distance_km`
-      distanceWhere = `AND (6371 * acos(
-        LEAST(1.0, GREATEST(-1.0,
-          cos(radians($1::float8)) * cos(radians(v.lat::float8))
-            * cos(radians(v.lng::float8) - radians($2::float8))
-            + sin(radians($1::float8)) * sin(radians(v.lat::float8))
-        ))
-      )) <= v.delivery_radius_km`
-      pIdx = 3
+    if (!userLat || !userLng) {
+      if (request.user?.id) {
+        const addrRes = await query(
+          `SELECT lat, lng FROM addresses WHERE user_id = $1 AND is_default = true LIMIT 1`,
+          [request.user.id]
+        )
+        if (addrRes.rows.length > 0 && addrRes.rows[0].lat && addrRes.rows[0].lng) {
+          userLat = parseFloat(addrRes.rows[0].lat)
+          userLng = parseFloat(addrRes.rows[0].lng)
+        }
+      }
     }
 
-    const conditions = [
-      'v.is_active = true',
-      "v.status = 'APPROVED'",
-      'v.deleted_at IS NULL'
-    ]
-
-    if (distanceWhere) {
-      conditions.push(distanceWhere.substring(4))
+    // Proximity check is strict. If coords missing, return empty.
+    if (!userLat || !userLng) {
+      return reply.code(200).send(success([], 'No coordinates available', {
+        pagination: { page, limit, total: 0, totalPages: 0 }
+      }))
     }
+
+    const params = [userLat, userLng]
+    const distanceSelect = `(6371 * acos(
+      LEAST(1.0, GREATEST(-1.0,
+        cos(radians($1::float8)) * cos(radians(v.lat::float8))
+          * cos(radians(v.lng::float8) - radians($2::float8))
+          + sin(radians($1::float8)) * sin(radians(v.lat::float8))
+      ))
+    ))::numeric(7,2) AS distance_km`
+
+    const distanceWhere = `(6371 * acos(
+      LEAST(1.0, GREATEST(-1.0,
+        cos(radians($1::float8)) * cos(radians(v.lat::float8))
+          * cos(radians(v.lng::float8) - radians($2::float8))
+          + sin(radians($1::float8)) * sin(radians(v.lat::float8))
+      ))
+    )) <= v.approved_service_radius_km`
+
+    const conditions = getEligibilityConditions()
+    conditions.push(distanceWhere)
+    let pIdx = 3
 
     if (category_id) {
       conditions.push(`EXISTS (
         SELECT 1 FROM vendor_services vs
-        JOIN garment_rates gr ON vs.garment_rate_id = gr.id
+        JOIN vendor_service_rates vsr ON vs.id = vsr.vendor_service_id
+        JOIN garment_types gt ON vsr.garment_type_id = gt.id
         WHERE vs.vendor_id = v.id
-          AND gr.category_id = $${pIdx++}
-          AND vs.is_available = true
+          AND gt.category_id = $${pIdx++}
+          AND vsr.is_active = true
           AND vs.deleted_at IS NULL
       )`)
       params.push(category_id)
@@ -204,17 +226,17 @@ export default async function discoveryRoutes(fastify) {
     if (garment_type_id) {
       conditions.push(`EXISTS (
         SELECT 1 FROM vendor_services vs
+        JOIN vendor_service_rates vsr ON vs.id = vsr.vendor_service_id
         WHERE vs.vendor_id = v.id
-          AND vs.garment_rate_id = $${pIdx++}
-          AND vs.is_available = true
+          AND vsr.garment_type_id = $${pIdx++}
+          AND vsr.is_active = true
           AND vs.deleted_at IS NULL
       )`)
       params.push(garment_type_id)
     }
 
-    // Capacity check
+    // Capacity slot hold limits check
     if (date && slot) {
-      // Exclude vendor if holds/orders consume max capacity for this slot
       conditions.push(`(
         SELECT COUNT(*)::int
         FROM slot_holds sh
@@ -235,19 +257,21 @@ export default async function discoveryRoutes(fastify) {
     }
 
     let orderByClause = 'ORDER BY v.created_at DESC'
-    if (sort === 'nearest' && lat && lng) {
+    if (sort === 'nearest') {
       orderByClause = 'ORDER BY distance_km ASC'
     } else if (sort === 'best_rating') {
       orderByClause = 'ORDER BY rating DESC'
     } else if (sort === 'price_asc') {
       orderByClause = `ORDER BY (
-        SELECT MIN(price) FROM vendor_services vs
-        WHERE vs.vendor_id = v.id AND vs.is_available = true AND vs.deleted_at IS NULL
+        SELECT MIN(vsr.rate_paise) FROM vendor_services vs
+        JOIN vendor_service_rates vsr ON vs.id = vsr.vendor_service_id
+        WHERE vs.vendor_id = v.id AND vsr.is_active = true AND vs.deleted_at IS NULL
       ) ASC NULLS LAST`
     } else if (sort === 'price_desc') {
       orderByClause = `ORDER BY (
-        SELECT MIN(price) FROM vendor_services vs
-        WHERE vs.vendor_id = v.id AND vs.is_available = true AND vs.deleted_at IS NULL
+        SELECT MIN(vsr.rate_paise) FROM vendor_services vs
+        JOIN vendor_service_rates vsr ON vs.id = vsr.vendor_service_id
+        WHERE vs.vendor_id = v.id AND vsr.is_active = true AND vs.deleted_at IS NULL
       ) DESC NULLS LAST`
     } else if (sort === 'value_for_money') {
       orderByClause = 'ORDER BY rating DESC, distance_km ASC NULLS LAST'
@@ -257,7 +281,7 @@ export default async function discoveryRoutes(fastify) {
     const listQuery = `
       SELECT v.id, v.name, v.slug, v.description, v.logo_url, v.banner_url,
              v.address_line1, v.city, v.lat, v.lng, v.operating_hours,
-             v.delivery_radius_km,
+             v.approved_service_radius_km,
              ${distanceSelect},
              COALESCE((SELECT AVG(vendor_rating) FROM reviews r WHERE r.vendor_id = v.id AND r.deleted_at IS NULL), 5.0)::numeric(2,1) AS rating
       FROM vendors v
@@ -304,36 +328,40 @@ export default async function discoveryRoutes(fastify) {
     }
   }, async (request, reply) => {
     const { vendorId } = request.params
+
+    const conditions = getEligibilityConditions()
+    conditions.push('v.id = $1')
+
     const vendorRes = await query(
       `SELECT v.id, v.name, v.slug, v.description, v.logo_url, v.banner_url,
-              v.address_line1, v.city, v.lat, v.lng, v.operating_hours, v.delivery_radius_km,
+              v.address_line1, v.city, v.lat, v.lng, v.operating_hours, v.approved_service_radius_km,
               COALESCE((SELECT AVG(vendor_rating) FROM reviews r WHERE r.vendor_id = v.id AND r.deleted_at IS NULL), 5.0)::numeric(2,1) AS rating
        FROM vendors v
-       WHERE v.id = $1 AND v.is_active = true AND v.deleted_at IS NULL`,
+       WHERE ${conditions.join(' AND ')}`,
       [vendorId]
     )
 
     const vendor = vendorRes.rows[0]
     if (!vendor) {
-      return reply.code(404).send(error('Vendor profile not found', 'VENDOR_NOT_FOUND'))
+      return reply.code(404).send(error('Vendor profile not found or inactive', 'VENDOR_NOT_FOUND'))
     }
 
     // Get services offered
     const servicesRes = await query(
-      `SELECT vs.id AS service_id, vs.price, vs.sale_price,
-              gr.id AS garment_rate_id, gr.name AS garment_name, gr.description, gr.unit, gr.thumbnail_url,
+      `SELECT vs.id AS service_id, vsr.rate_paise,
+              gt.id AS garment_type_id, gt.name AS garment_name, gt.unit,
               c.name AS category_name, c.id AS category_id
          FROM vendor_services vs
-         JOIN garment_rates gr ON vs.garment_rate_id = gr.id
-         LEFT JOIN categories c ON gr.category_id = c.id
+         JOIN vendor_service_rates vsr ON vs.id = vsr.vendor_service_id
+         JOIN garment_types gt ON vsr.garment_type_id = gt.id
+         LEFT JOIN service_categories c ON gt.category_id = c.id
         WHERE vs.vendor_id = $1
-          AND vs.is_available = true
+          AND vsr.is_active = true
           AND vs.deleted_at IS NULL
-          AND gr.is_active = true`,
+          AND gt.is_active = true`,
       [vendorId]
     )
 
-    // Format output
     const profile = {
       ...vendor,
       images: [vendor.logo_url, vendor.banner_url].filter(Boolean),
@@ -376,26 +404,27 @@ export default async function discoveryRoutes(fastify) {
     let pIdx = 2
 
     if (category_id) {
-      cond += ` AND gr.category_id = $${pIdx++}`
+      cond += ` AND gt.category_id = $${pIdx++}`
       params.push(category_id)
     }
 
     if (garment_type_id) {
-      cond += ` AND vs.garment_rate_id = $${pIdx++}`
+      cond += ` AND vsr.garment_type_id = $${pIdx++}`
       params.push(garment_type_id)
     }
 
     const servicesRes = await query(
-      `SELECT vs.id AS service_id, vs.price, vs.sale_price,
-              gr.id AS garment_rate_id, gr.name AS garment_name, gr.description, gr.unit, gr.thumbnail_url,
+      `SELECT vs.id AS service_id, vsr.rate_paise,
+              gt.id AS garment_type_id, gt.name AS garment_name, gt.unit,
               c.name AS category_name, c.id AS category_id
          FROM vendor_services vs
-         JOIN garment_rates gr ON vs.garment_rate_id = gr.id
-         LEFT JOIN categories c ON gr.category_id = c.id
+         JOIN vendor_service_rates vsr ON vs.id = vsr.vendor_service_id
+         JOIN garment_types gt ON vsr.garment_type_id = gt.id
+         LEFT JOIN service_categories c ON gt.category_id = c.id
         WHERE vs.vendor_id = $1
-          AND vs.is_available = true
+          AND vsr.is_active = true
           AND vs.deleted_at IS NULL
-          AND gr.is_active = true
+          AND gt.is_active = true
           ${cond}`,
       params
     )
@@ -419,13 +448,11 @@ export default async function discoveryRoutes(fastify) {
   }, async (request, reply) => {
     const { serviceId } = request.params
     const serviceRes = await query(
-      `SELECT vs.id AS service_id, vs.price, vs.sale_price, vs.max_order_qty,
-              gr.id AS garment_rate_id, gr.name AS garment_name, gr.description, gr.unit, gr.thumbnail_url,
-              c.name AS category_name, c.id AS category_id,
-              v.name AS vendor_name, v.id AS vendor_id
+      `SELECT vs.id AS service_id,
+              v.name AS vendor_name, v.id AS vendor_id,
+              c.name AS category_name, c.id AS category_id
          FROM vendor_services vs
-         JOIN garment_rates gr ON vs.garment_rate_id = gr.id
-         LEFT JOIN categories c ON gr.category_id = c.id
+         LEFT JOIN service_categories c ON vs.category_id = c.id
          JOIN vendors v ON vs.vendor_id = v.id
         WHERE vs.id = $1
           AND vs.deleted_at IS NULL`,
@@ -437,7 +464,6 @@ export default async function discoveryRoutes(fastify) {
       return reply.code(404).send(error('Service not found', 'SERVICE_NOT_FOUND'))
     }
 
-    // Load slot summary
     const slotsRes = await query(
       `SELECT id, day_of_week, start_time, end_time, max_orders
        FROM vendor_slots
@@ -446,12 +472,21 @@ export default async function discoveryRoutes(fastify) {
       [service.vendor_id]
     )
 
+    const ratesRes = await query(
+      `SELECT vsr.rate_paise, gt.id AS garment_type_id, gt.name AS garment_name, gt.unit
+       FROM vendor_service_rates vsr
+       JOIN garment_types gt ON vsr.garment_type_id = gt.id
+       WHERE vsr.vendor_service_id = $1 AND vsr.is_active = true AND gt.is_active = true`,
+      [serviceId]
+    )
+
     const details = {
       ...service,
       inclusions: ['Premium Detergent Wash', 'Steam Ironing', 'Hygiene Disinfectant Spray'],
       exclusions: ['Heavy Grease Stain Removal (Extra charges may apply)', 'Torn Garment Repair'],
       min_quantity: 1,
-      max_quantity: service.max_order_qty || 50,
+      max_quantity: 50,
+      rates: ratesRes.rows,
       slots_summary: slotsRes.rows
     }
 
@@ -479,26 +514,27 @@ export default async function discoveryRoutes(fastify) {
 
     // Search Categories
     const catsRes = await query(
-      `SELECT id, name, slug, description, image_url
-       FROM categories
+      `SELECT id, name, slug, description
+       FROM service_categories
        WHERE name ILIKE $1 AND is_active = true
        ORDER BY name ASC`,
       [likeVal]
     )
 
-    // Search Garment Rates (garment types)
+    // Search Garment Types
     const grRes = await query(
-      `SELECT id, name, slug, description, price, unit
-       FROM garment_rates
+      `SELECT id, name, slug, unit
+       FROM garment_types
        WHERE name ILIKE $1 AND is_active = true
        ORDER BY name ASC`,
       [likeVal]
     )
 
-    // Search Vendors (filtered by Haversine if coords present)
+    // Search Vendors (filtered by Haversine and eligibility constraints if coords present)
     let distSelect = 'NULL::numeric(7,2) AS distance_km'
-    let distWhere = ''
     const params = [likeVal]
+    const conditions = getEligibilityConditions()
+    conditions.push('v.name ILIKE $1')
 
     if (lat && lng) {
       params.push(lat, lng)
@@ -509,26 +545,26 @@ export default async function discoveryRoutes(fastify) {
             + sin(radians($2::float8)) * sin(radians(v.lat::float8))
         ))
       ))::numeric(7,2) AS distance_km`
-      distWhere = `AND (6371 * acos(
-        LEAST(1.0, GREATEST(-1.0,
-          cos(radians($2::float8)) * cos(radians(v.lat::float8))
-            * cos(radians(v.lng::float8) - radians($3::float8))
-            + sin(radians($2::float8)) * sin(radians(v.lat::float8))
-        ))
-      )) <= v.delivery_radius_km`
+      
+      conditions.push(
+        `(6371 * acos(
+          LEAST(1.0, GREATEST(-1.0,
+            cos(radians($2::float8)) * cos(radians(v.lat::float8))
+              * cos(radians(v.lng::float8) - radians($3::float8))
+              + sin(radians($2::float8)) * sin(radians(v.lat::float8))
+          ))
+        )) <= v.approved_service_radius_km`
+      )
     }
 
     const vendorsRes = await query(
       `SELECT v.id, v.name, v.slug, v.description, v.logo_url, v.banner_url,
               v.address_line1, v.city, v.lat, v.lng,
+              v.approved_service_radius_km,
               ${distSelect},
               COALESCE((SELECT AVG(vendor_rating) FROM reviews r WHERE r.vendor_id = v.id AND r.deleted_at IS NULL), 5.0)::numeric(2,1) AS rating
          FROM vendors v
-        WHERE v.name ILIKE $1
-          AND v.is_active = true
-          AND v.status = 'APPROVED'
-          AND v.deleted_at IS NULL
-          ${distWhere}
+        WHERE ${conditions.join(' AND ')}
         ORDER BY distance_km ASC NULLS LAST`,
       params
     )
@@ -557,11 +593,10 @@ export default async function discoveryRoutes(fastify) {
     const { q } = request.query
     const likeVal = `%${q}%`
 
-    // Limit suggestions to 5 items of each type
     const [cats, grs, vens] = await Promise.all([
-      query(`SELECT name FROM categories WHERE name ILIKE $1 AND is_active = true LIMIT 5`, [likeVal]),
-      query(`SELECT name FROM garment_rates WHERE name ILIKE $1 AND is_active = true LIMIT 5`, [likeVal]),
-      query(`SELECT name FROM vendors WHERE name ILIKE $1 AND is_active = true AND status = 'APPROVED' AND deleted_at IS NULL LIMIT 5`, [likeVal])
+      query(`SELECT name FROM service_categories WHERE name ILIKE $1 AND is_active = true LIMIT 5`, [likeVal]),
+      query(`SELECT name FROM garment_types WHERE name ILIKE $1 AND is_active = true LIMIT 5`, [likeVal]),
+      query(`SELECT name FROM vendors v WHERE v.name ILIKE $1 AND v.vendor_approved = true AND v.account_enabled = true AND v.marketplace_published = true AND v.deleted_at IS NULL LIMIT 5`, [likeVal])
     ])
 
     const suggestions = []
@@ -579,7 +614,7 @@ export default async function discoveryRoutes(fastify) {
       summary: 'Get sorting and filter options'
     }
   }, async (request, reply) => {
-    const typesRes = await query(`SELECT id, name FROM garment_rates WHERE is_active = true ORDER BY name ASC`)
+    const typesRes = await query(`SELECT id, name FROM garment_types WHERE is_active = true ORDER BY name ASC`)
     const filters = {
       sort_options: [
         { label: 'Nearest', value: 'nearest' },
@@ -623,10 +658,9 @@ export default async function discoveryRoutes(fastify) {
     const { vendors } = request.body
 
     const ranked = vendors.map(v => {
-      // value score formula
       const ratingWeight = v.rating * 20.0
       const distancePenalty = v.distance_km * 2.0
-      const pricePenalty = v.average_price_paise / 100.0 // penalize higher price
+      const pricePenalty = v.average_price_paise / 100.0
       const completionBonus = (v.completion_rate || 1.0) * 10.0
 
       const valueScore = ratingWeight - distancePenalty - pricePenalty + completionBonus
@@ -637,6 +671,6 @@ export default async function discoveryRoutes(fastify) {
       }
     }).sort((a, b) => b.value_score - a.value_score)
 
-    return reply.code(200).send(success(ranked, 'Vendors ranked by value score'))
+    return reply.code(200).send(success(ranked, 'vendors ranked by value score'))
   })
 }
