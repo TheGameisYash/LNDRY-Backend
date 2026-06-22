@@ -3,7 +3,7 @@ import { getClient } from '../../config/database.js'
 import { ShopFinancialsWriteRepository } from './shop-financials.write.repository.js'
 import { ShopFinancialsService } from './shop-financials.service.js'
 import { ShopFinancialsRepository } from './shop-financials.repository.js'
-import { TransactionWriterService } from '../shop-finance/transaction-writer.service.js'
+import { TransactionWriterService } from '../../../archived_modules/shop-finance/transaction-writer.service.js'
 import {
   computeCommission as ffComputeCommission,
   computeNetRevenue as ffComputeNetRevenue,

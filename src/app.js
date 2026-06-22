@@ -93,7 +93,11 @@ export const buildApp = async () => {
     prefix: '/api/v1/users',
   })
 
-  // Customers — dedicated customer profile routes
+  // Customers — dedicated customer profile routes (LNDRY-API-001 canonical)
+  await app.register(import('./modules/customers/customers.routes.js'), {
+    prefix: '/api/v1/customer/me',
+  })
+  // Backward-compatible alias — old path, will be removed after mobile app migration
   await app.register(import('./modules/customers/customers.routes.js'), {
     prefix: '/api/v1/customers',
   })
@@ -207,12 +211,20 @@ export const buildApp = async () => {
     prefix: '/api/v1/reviews',
   })
 
-  // Delivery — fully implemented (Disabled per requirements)
+  // Rider Assignments — delivery partner / rider operations (LNDRY-API-001 canonical)
+  await app.register(import('./modules/delivery/delivery.routes.js'), {
+    prefix: '/api/v1/rider/assignments',
+  })
+  // Backward-compatible alias — old path, will be removed after mobile app migration
   await app.register(import('./modules/delivery/delivery.routes.js'), {
     prefix: '/api/v1/delivery',
   })
 
-  // Vendor Orders — vendor-side order management (accept/reject, processing, reconciliation)
+  // Vendor Orders — vendor-side order management (LNDRY-API-001 canonical)
+  await app.register(import('./modules/vendor-orders/vendor-orders.routes.js'), {
+    prefix: '/api/v1/vendor/orders',
+  })
+  // Backward-compatible alias — old path, will be removed after mobile app migration
   await app.register(import('./modules/vendor-orders/vendor-orders.routes.js'), {
     prefix: '/api/v1/vendor-orders',
   })
@@ -262,7 +274,11 @@ export const buildApp = async () => {
   }, { prefix: '/api/v1/secure-documents' })
 
 
-  // Shop Staff — role-based access management
+  // Vendor Employees — role-based access management (LNDRY-API-001 canonical)
+  await app.register(import('./modules/vendor-employees/vendor-employees.routes.js'), {
+    prefix: '/api/v1/vendor/employees',
+  })
+  // Backward-compatible alias — old path, will be removed after mobile app migration
   await app.register(import('./modules/vendor-employees/vendor-employees.routes.js'), {
     prefix: '/api/v1/shop-staff',
   })
@@ -482,7 +498,7 @@ export const buildApp = async () => {
     },
   }, async () => ({
     status: 'OK',
-    service: 'bakaloo-backend',
+    service: 'lndry-backend',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     health: '/health/ready',

@@ -12,16 +12,16 @@ import { NotificationsService } from '../notifications/notifications.service.js'
 import { buildCustomerOrderEventNotification } from '../notifications/customer-order-event.helper.js'
 
 // Lazy-loaded collaborator instances (avoids circular imports)
-import { CartRepository } from '../cart/cart.repository.js'
-import { CartService } from '../cart/cart.service.js'
+import { CartRepository } from '../../../archived_modules/cart/cart.repository.js'
+import { CartService } from '../../../archived_modules/cart/cart.service.js'
 import { AddressesRepository } from '../addresses/addresses.repository.js'
-import { CouponsRepository } from '../coupons/coupons.repository.js'
-import { CouponsService } from '../coupons/coupons.service.js'
+import { CouponsRepository } from '../../../archived_modules/coupons/coupons.repository.js'
+import { CouponsService } from '../../../archived_modules/coupons/coupons.service.js'
 import { ShopProductsRepository } from '../shop-garment_rates/shop-garment_rates.repository.js'
 import { ShopProductsService } from '../shop-garment_rates/shop-garment_rates.service.js'
 import { OrderSplitterService } from './order-splitter.service.js'
 import { FeeSettingsService } from '../fee-settings/fee-settings.service.js'
-import { TotalsEngine } from '../cart/totals-engine.service.js'
+import { TotalsEngine } from '../../../archived_modules/cart/totals-engine.service.js'
 
 const DELIVERY_FEE = 25 // ₹25 flat delivery fee
 const PLATFORM_FEE = 5 // ₹5 platform fee

@@ -229,3 +229,60 @@ export async function recordOrderEvent(client, {
     [orderId, oldStatus, newStatus, actorId, note]
   )
 }
+
+/**
+ * Assert that a state transition is valid — throws if not.
+ * Use this in route handlers to guard transitions with a clear error.
+ *
+ * @param {string} currentStatus - Current order status
+ * @param {string} nextStatus - Desired next status
+ * @param {string} actorRole - Role of the actor performing the transition
+ * @throws {{ statusCode: number, message: string, code: string }}
+ */
+export function assertTransition(currentStatus, nextStatus, actorRole) {
+  const result = validateTransition(currentStatus, nextStatus, actorRole)
+  if (!result.valid) {
+    const err = new Error(result.message)
+    err.statusCode = 409
+    err.code = 'ORDER_STATE_INVALID'
+    throw err
+  }
+}
+
+/**
+ * Canonical LNDRY order lifecycle (for documentation and Swagger enum generation).
+ * Terminal states: CANCELLED, REFUNDED
+ */
+export const ORDER_LIFECYCLE = [
+  'PAYMENT_PENDING',
+  'WAITING_FOR_VENDOR_CONFIRMATION',
+  'VENDOR_ACCEPTED',
+  'PICKUP_ASSIGNED',
+  'GOING_FOR_PICKUP',
+  'PICKUP_OTP_VERIFIED',
+  'PICKED_UP',
+  'RECEIVED_AT_VENDOR',
+  'PROCESSING',
+  'PACKED',
+  'DELIVERY_ASSIGNED',
+  'OUT_FOR_DELIVERY',
+  'DELIVERY_OTP_VERIFIED',
+  'DELIVERED',
+]
+
+export const TERMINAL_STATUSES = ['CANCELLED', 'REFUNDED']
+
+/**
+ * Convenience export — the "orderStateMachine" utility object referenced
+ * by the LNDRY-API-001 contract.
+ */
+export const orderStateMachine = {
+  ORDER_STATUSES,
+  PROCESSING_STAGES,
+  ORDER_LIFECYCLE,
+  TERMINAL_STATUSES,
+  validateTransition,
+  assertTransition,
+  recordOrderEvent,
+}
+

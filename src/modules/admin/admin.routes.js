@@ -9,6 +9,8 @@ import {
   updateSettingsSchema,
 } from './admin.schema.js'
 
+import { requireStepUp } from '../../middlewares/requireStepUp.js'
+
 // New sub-modules
 import adminAuthRoutes from './auth/auth.routes.js'
 import adminDashboardRoutes from './dashboard/dashboard.routes.js'
@@ -37,7 +39,7 @@ export default async function adminRoutes(fastify) {
 
   const adminAuth = [fastify.authenticate, fastify.requireAdmin]
 
-  // ─── Legacy endpoints (kept for backwards compatibility) ───
+// ─── Legacy endpoints (kept for backwards compatibility) ───
 
   // Users management (not replicated in new sub-modules)
   fastify.get('/users', {
@@ -45,14 +47,16 @@ export default async function adminRoutes(fastify) {
     preHandler: adminAuth,
   }, controller.getAllUsers.bind(controller))
 
+  const highRiskAuth = [fastify.authenticate, fastify.requireAdmin, requireStepUp]
+
   fastify.patch('/users/:id/role', {
     schema: updateUserRoleSchema,
-    preHandler: adminAuth,
+    preHandler: highRiskAuth,
   }, controller.updateUserRole.bind(controller))
 
   fastify.put('/users/:id/block', {
     schema: blockUserSchema,
-    preHandler: adminAuth,
+    preHandler: highRiskAuth,
   }, controller.blockUser.bind(controller))
 
   // Settings (not replicated)
@@ -62,7 +66,8 @@ export default async function adminRoutes(fastify) {
   }, controller.getSettings.bind(controller))
 
   fastify.put('/settings', {
-    preHandler: adminAuth,
+    schema: updateSettingsSchema,
+    preHandler: highRiskAuth,
   }, controller.updateSettings.bind(controller))
 
   // ─── New Sub-Modules ────────────────────────────────

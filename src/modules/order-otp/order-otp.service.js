@@ -1,4 +1,4 @@
-import crypto from 'node:crypto'
+import bcrypt from 'bcrypt'
 import { query } from '../../config/database.js'
 
 /**
@@ -10,16 +10,19 @@ export class OrderOtpService {
    * Also updates the plaintext columns in the orders table so the customer can view it.
    */
   async generateOtp(orderId, purpose) {
-    const rawOtp = crypto.randomInt(100000, 999999).toString()
-    const otpHash = crypto.createHash('sha256').update(rawOtp).digest('hex')
+    // Generate a random 6-digit numeric string
+    const rawOtp = Math.floor(100000 + Math.random() * 900000).toString()
+    
+    // Hash with bcrypt (cost 12 matches auth.service)
+    const otpHash = await bcrypt.hash(rawOtp, 12)
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours expiry
 
     // 1. Insert/Replace in order_otps table
-    // Mark any existing active OTP for this order/purpose as consumed/cancelled
+    // Mark any existing active OTP for this order/purpose as used_at/consumed_at
     await query(
       `UPDATE order_otps 
-       SET consumed_at = NOW() 
-       WHERE order_id = $1 AND purpose = $2 AND consumed_at IS NULL`,
+       SET consumed_at = NOW(), used_at = NOW() 
+       WHERE order_id = $1 AND purpose = $2 AND used_at IS NULL`,
       [orderId, purpose]
     )
 
@@ -44,10 +47,10 @@ export class OrderOtpService {
    * Tracks and increments attempt count, locking after 5 failures.
    */
   async verifyOtp(orderId, purpose, rawOtp) {
-    // 1. Fetch active OTP
+    // 1. Fetch active OTP mapped to the correct purpose
     const { rows } = await query(
       `SELECT * FROM order_otps 
-       WHERE order_id = $1 AND purpose = $2 AND consumed_at IS NULL
+       WHERE order_id = $1 AND purpose = $2 AND used_at IS NULL
        ORDER BY created_at DESC LIMIT 1`,
       [orderId, purpose]
     )
@@ -65,12 +68,12 @@ export class OrderOtpService {
       throw { statusCode: 400, message: 'Verification locked. Too many failed attempts.', code: 'OTP_LOCKED' }
     }
 
-    const hashedInput = crypto.createHash('sha256').update(rawOtp).digest('hex')
+    const isMatch = await bcrypt.compare(rawOtp, activeOtp.otp_hash)
 
-    if (activeOtp.otp_hash === hashedInput) {
-      // Correct OTP: Mark as consumed
+    if (isMatch) {
+      // Correct OTP: Mark as consumed and used
       await query(
-        `UPDATE order_otps SET consumed_at = NOW() WHERE id = $1`,
+        `UPDATE order_otps SET consumed_at = NOW(), used_at = NOW() WHERE id = $1`,
         [activeOtp.id]
       )
 

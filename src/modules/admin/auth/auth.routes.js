@@ -186,4 +186,44 @@ export default async function adminAuthRoutes(fastify) {
     },
     controller.disable2FA.bind(controller),
   )
+
+  // ── STEP-UP 2FA ────────────────────────────────────────────────────
+  // POST /step-up — Verify TOTP and issue a step-up token for high-risk
+  // admin operations (refunds, settings changes, status overrides).
+  //
+  // The client sends the TOTP code in the request body. On success, a
+  // short-lived JWT (5 minutes) is returned. The client then attaches
+  // this token as the `x-step-up-token` header on the protected request.
+  //
+  // Requires: authenticate + requireAdmin (only admins can get step-up tokens)
+  fastify.post(
+    '/step-up',
+    {
+      schema: {
+        tags: ['Admin'],
+        summary: 'Get step-up token via TOTP for high-risk operations',
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['totp_code'],
+          properties: {
+            totp_code: {
+              type: 'string',
+              minLength: 6,
+              maxLength: 6,
+              description: 'TOTP code from authenticator app',
+            },
+          },
+        },
+      },
+      preHandler: [fastify.authenticate, fastify.requireAdmin],
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: '60 seconds',
+        },
+      },
+    },
+    controller.issueStepUp.bind(controller),
+  )
 }

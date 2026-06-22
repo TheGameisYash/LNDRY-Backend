@@ -145,8 +145,10 @@ export const getPayoutsSchema = {
 }
 
 export const updateLocationSchema = {
-  tags: ['Delivery'],
-  summary: 'Update current location',
+  tags: ['Rider Internal'],
+  summary: 'Update rider GPS location (RIDER-ONLY, not for customer UI)',
+  description: 'INTERNAL ONLY — Phase 1 excludes customer live-map. Do not expose to customer UI.',
+  security: [{ bearerAuth: [] }],
   body: {
     type: 'object',
     required: ['latitude', 'longitude'],

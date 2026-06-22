@@ -1,10 +1,10 @@
-import { ShopStaffController } from './vendor-employees.controller.js'
-import { ShopStaffService } from './vendor-employees.service.js'
-import { VendorEmployeesRepository as ShopStaffRepository } from './vendor-employees.repository.js'
+import { VendorEmployeesController } from './vendor-employees.controller.js'
+import { VendorEmployeesService } from './vendor-employees.service.js'
+import { VendorEmployeesRepository } from './vendor-employees.repository.js'
 
 /**
- * Shop Staff routes plugin
- * Prefix: /api/v1/shop-staff
+ * Vendor Employee routes plugin
+ * Prefix: /api/v1/vendor/employees (canonical) or /api/v1/shop-staff (legacy alias)
  *
  * Authorization (current state — task 2.2):
  *   - All routes require a valid JWT (fastify.authenticate)
@@ -17,38 +17,37 @@ import { VendorEmployeesRepository as ShopStaffRepository } from './vendor-emplo
  *   2. X-Shop-Id header (super admin)
  *   3. request body vendor_id (POST only — for create)
  */
-export default async function shopStaffRoutes(fastify) {
-  const repository = new ShopStaffRepository()
-  const service = new ShopStaffService(repository)
-  const controller = new ShopStaffController(service)
+export default async function vendorEmployeesRoutes(fastify) {
+  const repository = new VendorEmployeesRepository()
+  const service = new VendorEmployeesService(repository)
+  const controller = new VendorEmployeesController(service)
 
   /**
-   * Allow platform ADMIN or shop staff with SHOP_ADMIN role for write ops.
-   * Until task 2.3 adds shop_role to JWTs, only platform ADMIN can call write routes.
+   * Allow platform ADMIN or vendor employee with VENDOR_OWNER role for write ops.
    */
-  const canWrite = async function requireShopAdminOrPlatformAdmin(request, reply) {
+  const canWrite = async function requireVendorOwnerOrPlatformAdmin(request, reply) {
     const role = request.user?.role
     const shopRole = request.user?.shopRole || request.user?.shop_role
     if (role === 'ADMIN') return
-    if (shopRole === 'SHOP_ADMIN') return
+    if (shopRole === 'VENDOR_OWNER' || shopRole === 'SHOP_ADMIN') return
     return reply.code(403).send({
       success: false,
-      message: 'Forbidden — Shop Admin or Super Admin access required',
+      message: 'Forbidden — Vendor Owner or Super Admin access required',
       code: 'FORBIDDEN',
     })
   }
 
   /**
-   * Allow platform ADMIN or shop staff with SHOP_ADMIN/SHOP_MANAGER role for reads.
+   * Allow platform ADMIN or vendor employee with VENDOR_OWNER/VENDOR_STAFF role for reads.
    */
-  const canRead = async function requireShopAdminManagerOrPlatformAdmin(request, reply) {
+  const canRead = async function requireVendorStaffOrPlatformAdmin(request, reply) {
     const role = request.user?.role
     const shopRole = request.user?.shopRole || request.user?.shop_role
     if (role === 'ADMIN') return
-    if (shopRole === 'SHOP_ADMIN' || shopRole === 'SHOP_MANAGER') return
+    if (shopRole === 'VENDOR_OWNER' || shopRole === 'VENDOR_STAFF' || shopRole === 'SHOP_ADMIN' || shopRole === 'SHOP_MANAGER') return
     return reply.code(403).send({
       success: false,
-      message: 'Forbidden — Shop Admin/Manager or Super Admin access required',
+      message: 'Forbidden — Vendor Owner/Staff or Super Admin access required',
       code: 'FORBIDDEN',
     })
   }
@@ -60,7 +59,7 @@ export default async function shopStaffRoutes(fastify) {
   // Rate limited to prevent abuse of staff invitation endpoint
   fastify.post('/', {
     schema: {
-      tags: ['Shop Staff'],
+      tags: ['Vendor Employees'],
       summary: 'Assign staff to shop [Shop Admin]',
       security: [{ bearerAuth: [] }],
     },
@@ -76,7 +75,7 @@ export default async function shopStaffRoutes(fastify) {
   // GET / — List staff (Shop Admin/Manager / Super Admin)
   fastify.get('/', {
     schema: {
-      tags: ['Shop Staff'],
+      tags: ['Vendor Employees'],
       summary: 'List shop staff [Shop Admin/Manager]',
       security: [{ bearerAuth: [] }],
       querystring: {
@@ -96,7 +95,7 @@ export default async function shopStaffRoutes(fastify) {
   // GET /:id — Get a single staff record (Shop Admin/Manager / Super Admin)
   fastify.get('/:id', {
     schema: {
-      tags: ['Shop Staff'],
+      tags: ['Vendor Employees'],
       summary: 'Get staff record by ID [Shop Admin/Manager]',
       security: [{ bearerAuth: [] }],
       params: {
@@ -114,7 +113,7 @@ export default async function shopStaffRoutes(fastify) {
   // Canonical update method per design §6.3 / R29 AC#1.
   fastify.patch('/:id', {
     schema: {
-      tags: ['Shop Staff'],
+      tags: ['Vendor Employees'],
       summary: 'Update staff role/permissions [Shop Admin]',
       security: [{ bearerAuth: [] }],
       params: {
@@ -134,7 +133,7 @@ export default async function shopStaffRoutes(fastify) {
   // 401/403 first (don't leak method support to unauthorized clients).
   fastify.put('/:id', {
     schema: {
-      tags: ['Shop Staff'],
+      tags: ['Vendor Employees'],
       summary: 'Use PATCH instead — PUT is not supported',
       security: [{ bearerAuth: [] }],
       params: {
@@ -160,7 +159,7 @@ export default async function shopStaffRoutes(fastify) {
   // DELETE /:id — Soft-delete (deactivate) staff (Shop Admin / Super Admin)
   fastify.delete('/:id', {
     schema: {
-      tags: ['Shop Staff'],
+      tags: ['Vendor Employees'],
       summary: 'Deactivate staff member [Shop Admin]',
       security: [{ bearerAuth: [] }],
       params: {
@@ -190,7 +189,7 @@ export default async function shopStaffRoutes(fastify) {
   // superset of the permission audience.
   fastify.post('/:id/reset-password', {
     schema: {
-      tags: ['Shop Staff'],
+      tags: ['Vendor Employees'],
       summary: 'Reset staff password [Shop Admin]',
       security: [{ bearerAuth: [] }],
       params: {

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Bakaloo supports multi-option grocery products (e.g., Tomato 250g / 500g / 1kg / 2kg / 5kg, Maggi 95g / 3×95g / 4×95g) through a **product family** grouping model.
+LNDRY supports multi-option laundry products (e.g., Tomato 250g / 500g / 1kg / 2kg / 5kg, Maggi 95g / 3×95g / 4×95g) through a **product family** grouping model.
 
 ## Data Model
 

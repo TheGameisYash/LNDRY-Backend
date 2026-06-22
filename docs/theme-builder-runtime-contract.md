@@ -4,7 +4,7 @@
 
 ## Overview
 
-The Bakaloo theme builder system persists two parallel data streams:
+The LNDRY theme builder system persists two parallel data streams:
 
 1. **Theme chrome** (top bar, search, category tabs, store selector colors) — stored in `app_themes.theme_data` JSONB
 2. **Section manifest** (ordered list of homepage sections with config + merch binding) — stored in `section_manifests` table

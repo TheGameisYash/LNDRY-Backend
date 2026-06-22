@@ -1,7 +1,9 @@
 import { FeeSettingsController } from './fee-settings.controller.js'
 import { FeeSettingsService } from './fee-settings.service.js'
 import { FeeSettingsRepository } from './fee-settings.repository.js'
-import { TotalsEngine } from '../cart/totals-engine.service.js'
+import { TotalsEngine } from '../../../archived_modules/cart/totals-engine.service.js'
+
+import { requireStepUp } from '../../middlewares/requireStepUp.js'
 
 /**
  * Fee Settings admin routes plugin.
@@ -19,6 +21,7 @@ export default async function feeSettingsRoutes(fastify) {
   const totalsEngine = new TotalsEngine({ feeSettingsService: service })
   const controller = new FeeSettingsController(service, totalsEngine)
   const adminAuth = [fastify.authenticate, fastify.requireAdmin]
+  const highRiskAuth = [fastify.authenticate, fastify.requireAdmin, requireStepUp]
 
   fastify.get('/', {
     schema: { tags: ['Fee Settings'], summary: 'Get effective fee settings' },
@@ -27,7 +30,7 @@ export default async function feeSettingsRoutes(fastify) {
 
   fastify.put('/', {
     schema: { tags: ['Fee Settings'], summary: 'Update global fee settings' },
-    preHandler: adminAuth,
+    preHandler: highRiskAuth,
   }, controller.updateGlobal.bind(controller))
 
   fastify.put('/vendors/:shopId', {
@@ -40,7 +43,7 @@ export default async function feeSettingsRoutes(fastify) {
         properties: { shopId: { type: 'string', format: 'uuid' } },
       },
     },
-    preHandler: adminAuth,
+    preHandler: highRiskAuth,
   }, controller.updateShop.bind(controller))
 
   fastify.post('/preview', {

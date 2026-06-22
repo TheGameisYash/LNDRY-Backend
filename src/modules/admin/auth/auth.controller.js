@@ -466,4 +466,40 @@ export class AdminAuthController {
       return mapError(request, reply, err, 'disable2FA')
     }
   }
+
+  /**
+   * `POST /api/v1/admin/auth/step-up` (AUTH + ADMIN required).
+   *
+   * Verifies the submitted TOTP code against the admin's stored secret,
+   * then issues a short-lived step-up JWT (5 minutes) that the client
+   * attaches as `x-step-up-token` on the next high-risk request.
+   *
+   * The step-up token is NOT a session upgrade — it's a one-shot proof
+   * of recent TOTP verification. The requireStepUp middleware validates
+   * it on high-risk routes (refunds, settings, status overrides).
+   */
+  async issueStepUp(request, reply) {
+    const { totp_code } = request.body
+
+    try {
+      // Re-use the existing TOTP verification logic
+      await this.service.verifyTotpCode(request.user.id, totp_code)
+
+      // Import and generate step-up token
+      const { issueStepUpToken } = await import('../../../middlewares/requireStepUp.js')
+      const stepUpToken = issueStepUpToken(request.user.id)
+
+      return reply.code(200).send(
+        success(
+          {
+            step_up_token: stepUpToken,
+            expires_in_seconds: 300,
+          },
+          'Step-up token issued — attach as x-step-up-token header',
+        ),
+      )
+    } catch (err) {
+      return mapError(request, reply, err, 'issueStepUp')
+    }
+  }
 }

@@ -28,29 +28,29 @@ export async function startWorkerRuntime() {
     clearLegacyAssignmentTimeoutJobs,
   } = await import('../workers/processors.js')
 
-  const { createAllocationProcessor } = await import(
-    '../workers/allocation.worker.js'
-  )
+  // const { createAllocationProcessor } = await import(
+  //   '../workers/allocation.worker.js'
+  // )
 
-  const { createSettlementProcessor, scheduleSettlementCron } = await import(
-    '../workers/settlement.worker.js'
-  )
+  // const { createSettlementProcessor, scheduleSettlementCron } = await import(
+  //   '../workers/settlement.worker.js'
+  // )
 
-  const { createPayoutProcessor, schedulePayoutCron } = await import(
-    '../workers/payout.worker.js'
-  )
+  // const { createPayoutProcessor, schedulePayoutCron } = await import(
+  //   '../workers/payout.worker.js'
+  // )
 
-  const { createScheduledOrderProcessor } = await import(
-    '../workers/scheduled-orders.worker.js'
-  )
+  // const { createScheduledOrderProcessor } = await import(
+  //   '../workers/scheduled-orders.worker.js'
+  // )
 
-  const { createStockNotificationsProcessor } = await import(
-    '../workers/stock-notifications.worker.js'
-  )
+  // const { createStockNotificationsProcessor } = await import(
+  //   '../workers/stock-notifications.worker.js'
+  // )
 
-  const { createReportPrecomputeProcessor } = await import(
-    '../workers/report-precompute.worker.js'
-  )
+  // const { createReportPrecomputeProcessor } = await import(
+  //   '../workers/report-precompute.worker.js'
+  // )
 
   const { startEventLoopMonitor } = await import(
     '../utils/event-loop-monitor.js'
@@ -60,23 +60,23 @@ export async function startWorkerRuntime() {
   startOrderWorker(processOrderJob)
   startSmsWorker(processSmsJob)
   startThemeWorker(processThemeJob)
-  startAllocationWorker(createAllocationProcessor())
-  startSettlementWorker(
-    createSettlementProcessor({ queue: settlementQueue })
-  )
-  startPayoutWorker(createPayoutProcessor({ queue: payoutQueue }))
+  // startAllocationWorker(createAllocationProcessor())
+  // startSettlementWorker(
+  //   createSettlementProcessor({ queue: settlementQueue })
+  // )
+  // startPayoutWorker(createPayoutProcessor({ queue: payoutQueue }))
   // Scheduled-orders worker (task 10.3) — fires customer scheduled orders
   // at their scheduled_for time, places real orders, marks FAILED on
   // stock issues, and creates the next recurrence row when applicable.
-  startScheduledOrderWorker(createScheduledOrderProcessor())
+  // startScheduledOrderWorker(createScheduledOrderProcessor())
   // Stock-notifications worker (task 13.2) — fans out restock push +
   // in-app notifications to every customer who wishlisted a product
   // when its Shop_Product transitions from stock 0 → positive
   // (Requirements 3.4, 11.6).
-  startStockNotificationsWorker(createStockNotificationsProcessor())
+  // startStockNotificationsWorker(createStockNotificationsProcessor())
   // Report-precompute worker (task 13.4) — runs slow report queries
   // (>100ms median) and caches results to Redis under deterministic keys.
-  startReportPrecomputeWorker(createReportPrecomputeProcessor())
+  // startReportPrecomputeWorker(createReportPrecomputeProcessor())
 
   // LNDRY MVP workers
   const { createVendorAutoRejectProcessor, createSlotHoldExpiryProcessor } = await import(
@@ -90,23 +90,23 @@ export async function startWorkerRuntime() {
   // the event loop is blocked for >100ms.
   startEventLoopMonitor()
 
-  try {
-    await scheduleSettlementCron(settlementQueue)
-  } catch (err) {
-    logger.warn(
-      { err: err.message },
-      'Settlement daily cron registration failed'
-    )
-  }
+  // try {
+  //   await scheduleSettlementCron(settlementQueue)
+  // } catch (err) {
+  //   logger.warn(
+  //     { err: err.message },
+  //     'Settlement daily cron registration failed'
+  //   )
+  // }
 
-  try {
-    await schedulePayoutCron(payoutQueue)
-  } catch (err) {
-    logger.warn(
-      { err: err.message },
-      'Payout weekly cron registration failed'
-    )
-  }
+  // try {
+  //   await schedulePayoutCron(payoutQueue)
+  // } catch (err) {
+  //   logger.warn(
+  //     { err: err.message },
+  //     'Payout weekly cron registration failed'
+  //   )
+  // }
 
   try {
     const removedTimeoutJobs = await clearLegacyAssignmentTimeoutJobs()

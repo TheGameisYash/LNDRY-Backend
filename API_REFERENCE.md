@@ -1,4 +1,4 @@
-# 🛒 Bakaloo Grocery Backend — API Reference
+# 🛒 LNDRY Laundry Backend — API Reference
 
 > **Base URL:** `http://localhost:3000`  
 > **Framework:** Fastify (Node.js)  
@@ -442,7 +442,7 @@ ASSIGNED → ACCEPTED → PICKED_UP → DELIVERED
 ### Admin Login Request
 
 ```json
-{ "email": "admin@bakaloo.in", "password": "securePassword123" }
+{ "email": "admin@LNDRY.in", "password": "securePassword123" }
 ```
 
 ---

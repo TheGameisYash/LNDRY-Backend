@@ -1,4 +1,4 @@
-# Bakaloo Grocery Backend — Frontend Developer Guide
+# LNDRY Laundry Backend — Frontend Developer Guide
 
 > **Base URL:** `http://localhost:3000` (dev) | `https://api.yourdomain.com` (prod)
 > **API Version:** All routes prefixed with `/api/v1/`
@@ -577,8 +577,8 @@ These are the original admin endpoints. They remain active for backwards compati
 | `app_maintenance` | false | Maintenance mode flag |
 | `app_version` | "1.0.0" | Current app version |
 | `support_phone` | "+919775845587" | Support phone |
-| `support_email` | "support@groceryapp.com" | Support email |
-| `store_name` | "Bakaloo Grocery" | Store display name |
+| `support_email` | "support@Laundryapp.com" | Support email |
+| `store_name` | "LNDRY Laundry" | Store display name |
 | `store_gstin` | — | GST identification number |
 | `loyalty_rate` | 1 | Loyalty points per ₹100 spent |
 | `rider_base_pay` | 30 | Base delivery pay (₹) |
@@ -1167,7 +1167,7 @@ const payOnline = async (orderId) => {
     amount: data.amount,              // in paise (₹100 = 10000)
     currency: data.currency,
     order_id: data.razorpayOrderId,
-    name: 'Bakaloo Grocery',
+    name: 'LNDRY Laundry',
     description: 'Order Payment',
     prefill: { contact: userPhone },
     theme: { color: '#4CAF50' },

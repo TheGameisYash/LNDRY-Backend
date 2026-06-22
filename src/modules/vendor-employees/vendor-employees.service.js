@@ -157,7 +157,7 @@ function allowedTargetRoles({ invitedByPlatformRole, invitedByRole }) {
  *   - bcrypt cost 12 + Temp_Password    (R20.3, R20.10, R20.11, R20.12)
  *   - staff_created audit               (R20.10 / R28.4)
  */
-export class ShopStaffService {
+export class VendorEmployeesService {
   constructor(repository) {
     this.repo = repository
   }

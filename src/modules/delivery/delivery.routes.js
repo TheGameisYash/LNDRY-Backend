@@ -1,3 +1,6 @@
+// INTERNAL ONLY — Phase 1 excludes customer live-map. Do not expose to customer UI.
+// All routes in this module are restricted to authenticated DELIVERY_PARTNER / RIDER roles.
+
 import { DeliveryController } from './delivery.controller.js'
 import { DeliveryService } from './delivery.service.js'
 import { DeliveryRepository } from './delivery.repository.js'
@@ -105,8 +108,20 @@ export default async function deliveryRoutes(fastify) {
   }, controller.getPayouts.bind(controller))
 
   // PATCH /location — Update location
+  // RIDER-ONLY: This route must NOT be accessible by customers.
+  // Phase 1 excludes customer live-map tracking.
   fastify.patch('/location', {
     schema: updateLocationSchema,
+    preHandler: [async function requireRiderRole(request, reply) {
+      const role = request.user?.role
+      if (role !== 'DELIVERY_PARTNER' && role !== 'RIDER' && role !== 'ADMIN') {
+        return reply.code(403).send({
+          success: false,
+          message: 'Forbidden — rider or admin role required',
+          code: 'FORBIDDEN',
+        })
+      }
+    }],
   }, controller.updateLocation.bind(controller))
 
   // GET /history — Delivery history

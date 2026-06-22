@@ -264,7 +264,7 @@ export class PaymentsService {
 
     // Clear the cart - only after payment is confirmed.
     try {
-      const { CartRepository } = await import('../cart/cart.repository.js')
+      const { CartRepository } = await import('../../../archived_modules/cart/cart.repository.js')
       const cartRepo = new CartRepository()
       await cartRepo.clearCart(userId)
       await cartRepo.clearExtras(userId)

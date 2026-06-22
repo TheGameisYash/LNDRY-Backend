@@ -35,7 +35,7 @@
 ### Start the server
 
 ```bash
-cd bakaloo-backend
+cd lndry-backend
 npm run dev          # Starts on http://localhost:3000
 ```
 

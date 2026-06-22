@@ -145,6 +145,8 @@ beforeAll(async () => {
     }
   })
 
+  app.decorate('requireAdmin', async (request, reply) => {})
+
   // Register admin auth routes
   const { default: adminAuthRoutes } = await import(
     '../../src/modules/admin/auth/auth.routes.js'

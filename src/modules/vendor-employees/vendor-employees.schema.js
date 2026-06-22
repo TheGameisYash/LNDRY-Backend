@@ -100,13 +100,13 @@ const newUserCreateSchema = z.object({
  * `email` on an existing-user body will be rejected at validation time,
  * eliminating the "did you mean to create a new user?" ambiguity.
  */
-export const createShopStaffSchema = z.union([
+export const createVendorEmployeeSchema = z.union([
   existingUserCreateSchema,
   newUserCreateSchema,
 ])
 
 // ─── UPDATE SHOP STAFF ───────────────────────────────────
-export const updateShopStaffSchema = z
+export const updateVendorEmployeeSchema = z
   .object({
     role: z.enum(VALID_ROLES).optional(),
     permissions: z
@@ -124,7 +124,7 @@ export const updateShopStaffSchema = z
   )
 
 // ─── LIST SHOP STAFF QUERY ───────────────────────────────
-export const listShopStaffQuerySchema = z.object({
+export const listVendorEmployeeQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   role: z.enum(VALID_ROLES).optional(),
@@ -135,6 +135,6 @@ export const listShopStaffQuerySchema = z.object({
 })
 
 // ─── PARAMS ──────────────────────────────────────────────
-export const shopStaffIdParamSchema = z.object({
+export const vendorEmployeeIdParamSchema = z.object({
   id: z.string().uuid(),
 })

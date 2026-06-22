@@ -1,9 +1,9 @@
 import { success, error } from '../../utils/apiResponse.js'
 import {
-  createShopStaffSchema,
-  updateShopStaffSchema,
-  listShopStaffQuerySchema,
-  shopStaffIdParamSchema,
+  createVendorEmployeeSchema,
+  updateVendorEmployeeSchema,
+  listVendorEmployeeQuerySchema,
+  vendorEmployeeIdParamSchema,
 } from './vendor-employees.schema.js'
 
 /**
@@ -41,7 +41,7 @@ function resolveShopId(request) {
  * Shop Staff controller — thin HTTP layer.
  * Handles request/response shape only and delegates to the service.
  */
-export class ShopStaffController {
+export class VendorEmployeesController {
   constructor(service) {
     this.service = service
   }
@@ -52,7 +52,7 @@ export class ShopStaffController {
    * Response: 201 Created
    */
   async create(request, reply) {
-    const parsed = createShopStaffSchema.safeParse(request.body)
+    const parsed = createVendorEmployeeSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.code(400).send(
         error(
@@ -79,7 +79,7 @@ export class ShopStaffController {
    * Scoped via JWT vendor_id or X-Shop-Id header (super admin).
    */
   async list(request, reply) {
-    const parsed = listShopStaffQuerySchema.safeParse(request.query)
+    const parsed = listVendorEmployeeQuerySchema.safeParse(request.query)
     if (!parsed.success) {
       return reply.code(400).send(
         error(
@@ -106,7 +106,7 @@ export class ShopStaffController {
    * GET /:id — Get a single staff record (scoped to vendor_id).
    */
   async getOne(request, reply) {
-    const paramsParsed = shopStaffIdParamSchema.safeParse(request.params)
+    const paramsParsed = vendorEmployeeIdParamSchema.safeParse(request.params)
     if (!paramsParsed.success) {
       return reply.code(400).send(error('Invalid staff ID format', 'VALIDATION_ERROR'))
     }
@@ -137,12 +137,12 @@ export class ShopStaffController {
    * `staff_updated` audit row carries request metadata (R28 AC#4).
    */
   async update(request, reply) {
-    const paramsParsed = shopStaffIdParamSchema.safeParse(request.params)
+    const paramsParsed = vendorEmployeeIdParamSchema.safeParse(request.params)
     if (!paramsParsed.success) {
       return reply.code(400).send(error('Invalid staff ID format', 'VALIDATION_ERROR'))
     }
 
-    const bodyParsed = updateShopStaffSchema.safeParse(request.body)
+    const bodyParsed = updateVendorEmployeeSchema.safeParse(request.body)
     if (!bodyParsed.success) {
       return reply.code(400).send(
         error(
@@ -197,7 +197,7 @@ export class ShopStaffController {
    * DELETE /:id — Soft-delete (deactivate) a staff member.
    */
   async delete(request, reply) {
-    const paramsParsed = shopStaffIdParamSchema.safeParse(request.params)
+    const paramsParsed = vendorEmployeeIdParamSchema.safeParse(request.params)
     if (!paramsParsed.success) {
       return reply.code(400).send(error('Invalid staff ID format', 'VALIDATION_ERROR'))
     }
@@ -237,7 +237,7 @@ export class ShopStaffController {
    * the gate (HQ_ROLE_PERMISSIONS / SHOP_ROLE_DEFAULT_PERMISSIONS).
    */
   async resetPassword(request, reply) {
-    const paramsParsed = shopStaffIdParamSchema.safeParse(request.params)
+    const paramsParsed = vendorEmployeeIdParamSchema.safeParse(request.params)
     if (!paramsParsed.success) {
       return reply.code(400).send(error('Invalid staff ID format', 'VALIDATION_ERROR'))
     }

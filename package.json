@@ -1,5 +1,5 @@
 {
-  "name": "bakaloo-backend",
+  "name": "lndry-backend",
   "version": "1.0.0",
   "description": "Laundry service booking and fulfilment platform — Fastify backend API",
   "type": "module",

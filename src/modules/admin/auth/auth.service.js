@@ -1413,6 +1413,46 @@ export class AdminAuthService {
     await this.repository.disableTotp(userId)
     return { success: true }
   }
+
+  /**
+   * Verify a TOTP code for an admin user without performing a full login.
+   * Used by the step-up token issuance flow (POST /api/v1/admin/auth/step-up).
+   *
+   * @param {string} userId - User ID
+   * @param {string} code - TOTP code to verify
+   * @throws {{ statusCode: number, code: string, message: string }}
+   */
+  async verifyTotpCode(userId, code) {
+    const user = await this.repository.findUserById(userId)
+    if (!user || !user.totp_secret) {
+      throw {
+        statusCode: 400,
+        code: '2FA_NOT_ENABLED',
+        message: 'Two-factor authentication is not enabled for this user. Set up TOTP first.',
+      }
+    }
+
+    if (!user.totp_enabled) {
+      throw {
+        statusCode: 400,
+        code: '2FA_NOT_ENABLED',
+        message: 'Two-factor authentication is configured but not yet enabled. Complete setup first.',
+      }
+    }
+
+    const { authenticator } = await import('otplib')
+    const verified = authenticator.verify({ token: code, secret: user.totp_secret })
+
+    if (!verified) {
+      throw {
+        statusCode: 401,
+        code: ERROR_CODES.INVALID_CREDENTIALS,
+        message: 'Invalid TOTP code',
+      }
+    }
+
+    return { verified: true }
+  }
 }
 
 /**
