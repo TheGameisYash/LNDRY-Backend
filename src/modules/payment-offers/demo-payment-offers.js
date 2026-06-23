@@ -2,7 +2,7 @@ const DEMO_PAYMENT_OFFERS = [
   {
     id: '0c3ab950-b432-4ee8-9d8a-0d9604e36c90',
     title: 'Get ₹125 instant cashback',
-    description: 'Use HDFC Bank credit cards on Razorpay for bigger grocery carts.',
+    description: 'Use HDFC Bank credit cards on Razorpay for bigger laundry bookings.',
     provider: 'HDFC Bank',
     icon_url: null,
     cashback_amount: 125,

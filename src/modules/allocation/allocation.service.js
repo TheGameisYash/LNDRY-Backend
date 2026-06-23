@@ -11,14 +11,14 @@ import { allocationQueue } from '../../config/bullmq.js'
  *   - Merge + dedup by vendor_id (Property 5)
  *   - Mark closest as primary; tie-break by earliest created_at (Req 4.4)
  *   - Atomic replace of allocations in a transaction (delegated to repo)
- *   - Redis cache for `bakaloo:allocation:v1:{user_id}` (TTL 600s)
+ *   - Redis cache for `lndry:allocation:v1:{user_id}` (TTL 600s)
  *   - Enqueue BullMQ `recompute-by-shop` jobs for shop area changes
  *
  * The service does no IO except via the repository, the cache utility, and
  * the BullMQ producer — keeping the controller and worker thin.
  */
 
-const CACHE_PREFIX = 'bakaloo:allocation:v1'
+const CACHE_PREFIX = 'lndry:allocation:v1'
 const CACHE_TTL_SECONDS = 600
 
 export class AllocationService {

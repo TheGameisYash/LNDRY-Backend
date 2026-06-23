@@ -1,7 +1,7 @@
 import { cacheGet, cacheSet, cacheDeletePattern } from '../../src/utils/cache.js'
 import { logger } from '../../src/config/logger.js'
 
-const CACHE_PREFIX = 'bakaloo:product-families:v1'
+const CACHE_PREFIX = 'lndry:product-families:v1'
 const CACHE_TTL = 300 // 5 min
 
 function generateSlug(name) {

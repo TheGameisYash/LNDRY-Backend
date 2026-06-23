@@ -967,7 +967,7 @@ export class DeliveryRepository {
     const settings = {
       lat: null,
       lng: null,
-      name: 'Bakaloo Store',
+      name: 'LNDRY Store',
       address: 'Assigned pickup hub',
       phone: '',
     }

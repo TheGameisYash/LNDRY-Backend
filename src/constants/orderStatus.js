@@ -9,7 +9,7 @@ import { ORDER_STATUSES } from '../utils/state-machine.js'
 
 export const ORDER_STATUS = {
   ...ORDER_STATUSES,
-  // Legacy aliases used by the old grocery-era code, kept for backward compat
+  // Legacy aliases used by the old legacy-era code, kept for backward compat
   PENDING: 'PENDING',
   CONFIRMED: 'CONFIRMED',
   PREPARING: 'PREPARING',

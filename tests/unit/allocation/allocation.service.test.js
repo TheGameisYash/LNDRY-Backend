@@ -207,7 +207,7 @@ describe('AllocationService.computeAndUpsertForUser()', () => {
     // SHOP_B is closer so it should be primary
     const primary = upsertArgs[1].find((a) => a.is_primary)
     expect(primary.vendor_id).toBe(SHOP_B)
-    expect(cacheDel).toHaveBeenCalledWith(`bakaloo:allocation:v1:${USER_ID}`)
+    expect(cacheDel).toHaveBeenCalledWith(`lndry:allocation:v1:${USER_ID}`)
   })
 
   it('persists empty list when no vendors match (Requirement 4.7)', async () => {
@@ -246,7 +246,7 @@ describe('AllocationService.getForUser()', () => {
 
     const result = await service.getForUser(USER_ID)
 
-    expect(cacheGet).toHaveBeenCalledWith(`bakaloo:allocation:v1:${USER_ID}`)
+    expect(cacheGet).toHaveBeenCalledWith(`lndry:allocation:v1:${USER_ID}`)
     expect(repo.findByUserId).not.toHaveBeenCalled()
     expect(result.vendors).toHaveLength(1)
   })
@@ -277,7 +277,7 @@ describe('AllocationService.getForUser()', () => {
       },
     ])
     expect(cacheSet).toHaveBeenCalledWith(
-      `bakaloo:allocation:v1:${USER_ID}`,
+      `lndry:allocation:v1:${USER_ID}`,
       result,
       600
     )
@@ -431,7 +431,7 @@ describe('AllocationService.computeAndUpsertForUser() — persistence + response
       pincode: '560001',
     })
 
-    const cacheKey = `bakaloo:allocation:v1:${USER_ID}`
+    const cacheKey = `lndry:allocation:v1:${USER_ID}`
     expect(cacheDel).toHaveBeenCalledWith(cacheKey)
     expect(cacheSet).toHaveBeenCalledWith(cacheKey, { vendors: [] }, 600)
 

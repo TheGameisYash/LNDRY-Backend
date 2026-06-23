@@ -211,12 +211,12 @@ describe('ShopFinancialsService.authorizeRead (Requirements 14.5, 14.7)', () => 
 describe('ShopFinancialsService cache key shape (design.md Caching Strategy)', () => {
   const svc = () => new ShopFinancialsService(new ShopFinancialsRepository())
 
-  it('uses the canonical bakaloo:financials:v1 prefix and 900s TTL', () => {
-    expect(SHOP_FINANCIALS_CACHE_PREFIX).toBe('bakaloo:financials:v1')
+  it('uses the canonical lndry:financials:v1 prefix and 900s TTL', () => {
+    expect(SHOP_FINANCIALS_CACHE_PREFIX).toBe('lndry:financials:v1')
     expect(SHOP_FINANCIALS_CACHE_TTL_SECONDS).toBe(900)
   })
 
-  it('builds bakaloo:financials:v1:{shop}:{period}:{from}:{to}:{status}:p{page}', () => {
+  it('builds lndry:financials:v1:{shop}:{period}:{from}:{to}:{status}:p{page}', () => {
     const key = svc().cacheKeyForList('shop-uuid', {
       period_type: 'DAILY',
       from: '2024-01-01',
@@ -225,7 +225,7 @@ describe('ShopFinancialsService cache key shape (design.md Caching Strategy)', (
       limit: 20,
     })
     expect(key).toBe(
-      'bakaloo:financials:v1:shop-uuid:DAILY:2024-01-01:2024-01-31:all:p1:l20'
+      'lndry:financials:v1:shop-uuid:DAILY:2024-01-01:2024-01-31:all:p1:l20'
     )
   })
 
@@ -233,7 +233,7 @@ describe('ShopFinancialsService cache key shape (design.md Caching Strategy)', (
     const key = svc().cacheKeyForList('shop-uuid', { page: 2, limit: 50 })
     // Every slot present, even when filter is omitted, so two distinct
     // filter combinations cannot accidentally produce the same key.
-    expect(key).toBe('bakaloo:financials:v1:shop-uuid:all:all:all:all:p2:l50')
+    expect(key).toBe('lndry:financials:v1:shop-uuid:all:all:all:all:p2:l50')
   })
 
   it('produces different keys for different filter combinations', () => {

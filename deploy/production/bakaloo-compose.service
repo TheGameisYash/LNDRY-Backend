@@ -1,12 +1,12 @@
 [Unit]
-Description=Bakaloo backend docker compose stack
+Description=LNDRY backend docker compose stack
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/bakaloo/app
+WorkingDirectory=/opt/lndry/app
 RemainAfterExit=yes
 ExecStart=/usr/bin/docker compose --env-file deploy/production/infra.env -f docker-compose.prod.yml up -d
 ExecStop=/usr/bin/docker compose --env-file deploy/production/infra.env -f docker-compose.prod.yml down

@@ -176,7 +176,7 @@ function setupHqUser() {
       return {
         rows: [{
           id: HQ_USER_ID,
-          email: 'admin@bakaloo.com',
+          email: 'admin@lndry.com',
           full_name: 'HQ Admin',
           phone: '+919876543210',
           role: 'ADMIN',
@@ -199,7 +199,7 @@ function setupStoreSingleShopUser() {
       return {
         rows: [{
           id: STORE_USER_ID,
-          email: 'store@bakaloo.com',
+          email: 'store@lndry.com',
           full_name: 'Store Manager',
           phone: '+919876543211',
           role: 'CUSTOMER',
@@ -235,7 +235,7 @@ function setupStoreMultiShopUser() {
       return {
         rows: [{
           id: MULTI_SHOP_USER_ID,
-          email: 'multi@bakaloo.com',
+          email: 'multi@lndry.com',
           full_name: 'Multi Store User',
           phone: '+919876543212',
           role: 'CUSTOMER',
@@ -280,7 +280,7 @@ function setupInactiveUser() {
       return {
         rows: [{
           id: INACTIVE_USER_ID,
-          email: 'inactive@bakaloo.com',
+          email: 'inactive@lndry.com',
           full_name: 'Inactive User',
           phone: '+919876543213',
           role: 'CUSTOMER',
@@ -303,7 +303,7 @@ function setupNoActiveShopsUser() {
       return {
         rows: [{
           id: NO_SHOPS_USER_ID,
-          email: 'noshops@bakaloo.com',
+          email: 'noshops@lndry.com',
           full_name: 'No Shops User',
           phone: '+919876543214',
           role: 'CUSTOMER',
@@ -336,7 +336,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/auth/login',
-        payload: { email: 'admin@bakaloo.com', password: PASSWORD },
+        payload: { email: 'admin@lndry.com', password: PASSWORD },
       })
 
       expect(res.statusCode).toBe(200)
@@ -345,7 +345,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       expect(body.data).toHaveProperty('accessToken')
       expect(body.data.user).toMatchObject({
         id: HQ_USER_ID,
-        email: 'admin@bakaloo.com',
+        email: 'admin@lndry.com',
         platform_role: 'SUPER_ADMIN',
       })
       // HQ users get isSuperAdmin flag
@@ -358,7 +358,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       await app.inject({
         method: 'POST',
         url: '/api/v1/admin/auth/login',
-        payload: { email: 'admin@bakaloo.com', password: PASSWORD },
+        payload: { email: 'admin@lndry.com', password: PASSWORD },
       })
 
       // Verify audit was emitted via pool.query (fire-and-forget INSERT)
@@ -382,7 +382,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/auth/login',
-        payload: { email: 'store@bakaloo.com', password: PASSWORD },
+        payload: { email: 'store@lndry.com', password: PASSWORD },
       })
 
       expect(res.statusCode).toBe(200)
@@ -401,7 +401,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/auth/login',
-        payload: { email: 'multi@bakaloo.com', password: PASSWORD },
+        payload: { email: 'multi@lndry.com', password: PASSWORD },
       })
 
       expect(res.statusCode).toBe(200)
@@ -423,7 +423,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/auth/login',
-        payload: { email: 'inactive@bakaloo.com', password: PASSWORD },
+        payload: { email: 'inactive@lndry.com', password: PASSWORD },
       })
 
       expect(res.statusCode).toBe(403)
@@ -438,7 +438,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       await app.inject({
         method: 'POST',
         url: '/api/v1/admin/auth/login',
-        payload: { email: 'inactive@bakaloo.com', password: PASSWORD },
+        payload: { email: 'inactive@lndry.com', password: PASSWORD },
       })
 
       await new Promise((r) => setImmediate(r))
@@ -459,7 +459,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/auth/login',
-        payload: { email: 'noshops@bakaloo.com', password: PASSWORD },
+        payload: { email: 'noshops@lndry.com', password: PASSWORD },
       })
 
       expect(res.statusCode).toBe(403)
@@ -477,7 +477,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/auth/login',
-        payload: { email: 'admin@bakaloo.com', password: 'WrongPassword999' },
+        payload: { email: 'admin@lndry.com', password: 'WrongPassword999' },
       })
 
       expect(res.statusCode).toBe(401)
@@ -492,7 +492,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       await app.inject({
         method: 'POST',
         url: '/api/v1/admin/auth/login',
-        payload: { email: 'admin@bakaloo.com', password: 'WrongPassword999' },
+        payload: { email: 'admin@lndry.com', password: 'WrongPassword999' },
       })
 
       await new Promise((r) => setImmediate(r))
@@ -513,7 +513,7 @@ describe('POST /api/v1/admin/auth/login — Login Matrix (Task 23.1)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/auth/login',
-        payload: { email: 'unknown@bakaloo.com', password: PASSWORD },
+        payload: { email: 'unknown@lndry.com', password: PASSWORD },
       })
 
       expect(res.statusCode).toBe(401)

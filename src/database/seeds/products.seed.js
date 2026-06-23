@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
  * @param {Array} categories - Seeded categories with IDs
  */
 export async function seedProducts(pool, categories) {
-  console.log('🌱 Seeding garment_rates...')
+  console.log('🌱 Seeding garment_types...')
 
   const catMap = {}
   for (const c of categories) {
@@ -56,13 +56,13 @@ export async function seedProducts(pool, categories) {
     if (!categoryId) continue
 
     await pool.query(
-      `INSERT INTO garment_rates (id, name, slug, price, unit, stock_quantity, category_id, is_featured, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+      `INSERT INTO garment_types (id, name, slug, unit, stock_quantity, category_id, is_featured, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true)
        ON CONFLICT (slug) DO NOTHING`,
-      [uuidv4(), p.name, p.slug, p.price, p.unit, p.stock, categoryId, p.featured || false]
+      [uuidv4(), p.name, p.slug, p.unit, p.stock, categoryId, p.featured || false]
     )
     count++
   }
 
-  console.log(`  ✅ ${count} garment_rates seeded`)
+  console.log(`  ✅ ${count} garment_types seeded`)
 }

@@ -76,7 +76,7 @@ export async function sendPush(fcmToken, { title, body, imageUrl, deepLink, data
         priority: 'high',
         notification: {
           sound: 'default',
-          channelId: 'bakaloo_notifications',
+          channelId: 'lndry_notifications',
           imageUrl: imageUrl && isValidHttpsUrl(imageUrl) ? imageUrl : undefined,
           clickAction: 'FLUTTER_NOTIFICATION_CLICK',
         },
@@ -136,7 +136,7 @@ export async function sendPushBatch(fcmTokens, { title, body, imageUrl, deepLink
         priority: 'high',
         notification: {
           sound: 'default',
-          channelId: 'bakaloo_notifications',
+          channelId: 'lndry_notifications',
           imageUrl: imageUrl && isValidHttpsUrl(imageUrl) ? imageUrl : undefined,
           clickAction: 'FLUTTER_NOTIFICATION_CLICK',
         },

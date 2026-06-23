@@ -324,7 +324,7 @@ function downloadProxyCandidate(rawUrl, redirectCount = 0) {
       parsed,
       {
         headers: {
-          'User-Agent': 'BakalooProxy/1.0',
+          'User-Agent': 'LNDRYProxy/1.0',
         },
       },
       (response) => {

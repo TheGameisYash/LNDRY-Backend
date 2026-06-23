@@ -10,7 +10,7 @@ import { query } from '../../config/database.js'
  *     `emit` / `emitInTx` helpers) and is invoked from every mutating
  *     service per design §12.2. There are no UPDATE or DELETE methods, by
  *     design — the static-grep CI check (design §17 Property 7) and the
- *     deploy-time DB role grant (`bakaloo_app` holds INSERT+SELECT only)
+ *     deploy-time DB role grant (`lndry_app` holds INSERT+SELECT only)
  *     enforce the same invariant operationally.
  *
  * Conventions (project-standards.md):

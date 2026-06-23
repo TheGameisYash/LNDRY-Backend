@@ -1,3 +1,7 @@
+// PHASE 1 SCOPE: No live tracking for customers. 
+// Rider uses external Google Maps for navigation.
+// Customer sees status timeline only (not GPS coordinates).
+
 import fp from 'fastify-plugin'
 import { Server } from 'socket.io'
 import { env } from '../config/env.js'
@@ -132,55 +136,6 @@ async function socketioPlugin(fastify) {
     // ─── RIDER EVENTS ────────────────────────────────
     if (role === 'RIDER') {
       socket.join('riders:online')
-
-      // Rider sends location updates
-      socket.on('rider:location', async (data) => {
-        try {
-          const latitude = Number(data?.latitude ?? data?.lat)
-          const longitude = Number(data?.longitude ?? data?.lng)
-          const orderId = data?.orderId
-
-          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-            return
-          }
-
-          // Store in Redis (fast reads for proximity)
-          await redis.setex(
-            `${RIDER_LOCATION_PREFIX}${userId}`,
-            RIDER_LOCATION_TTL,
-            JSON.stringify({ lat: latitude, lng: longitude, updatedAt: Date.now() })
-          )
-
-          // Persist latest coordinates in DB for assignment fallback.
-          await query(
-            `UPDATE rider_profiles
-             SET current_lat = $1, current_lng = $2, updated_at = NOW()
-             WHERE user_id = $3`,
-            [latitude, longitude, userId]
-          )
-
-          // Broadcast to order room (customer tracking)
-          if (orderId) {
-            io.to(`order:${orderId}`).emit('rider:location:update', {
-              orderId,
-              riderId: userId,
-              latitude,
-              longitude,
-              timestamp: Date.now(),
-            })
-          }
-
-          // Broadcast to admin
-          io.to('riders:online').emit('rider:location:bulk', {
-            riderId: userId,
-            latitude,
-            longitude,
-            timestamp: Date.now(),
-          })
-        } catch (err) {
-          logger.error({ err, userId }, 'Rider location update failed')
-        }
-      })
 
       // Rider goes offline
       socket.on('rider:offline', async () => {
@@ -381,41 +336,8 @@ async function socketioPlugin(fastify) {
     logger.info({ orderId, shopId, riderId, event: 'order.out_for_delivery' }, 'OUT_FOR_DELIVERY events emitted to all channels')
   })
 
-  // Periodic: broadcast all rider locations to admin dashboard every 10s
-  const riderLocationInterval = setInterval(async () => {
-    try {
-      // Task 13.5: Use SCAN-based pattern matching instead of KEYS *
-      const keys = []
-      let cursor = '0'
-      do {
-        const [nextCursor, batch] = await redis.scan(cursor, 'MATCH', `${RIDER_LOCATION_PREFIX}*`, 'COUNT', 100)
-        cursor = nextCursor
-        if (batch.length > 0) keys.push(...batch)
-      } while (cursor !== '0')
-
-      if (keys.length === 0) return
-
-      const pipeline = redis.pipeline()
-      keys.forEach(k => pipeline.get(k))
-      const results = await pipeline.exec()
-
-      const locations = keys.map((key, i) => {
-        const riderId = key.replace(RIDER_LOCATION_PREFIX, '')
-        const data = results[i][1] ? JSON.parse(results[i][1]) : null
-        return data ? { riderId, ...data } : null
-      }).filter(Boolean)
-
-      if (locations.length > 0) {
-        io.to('admin:dashboard').emit('dashboard:rider_locations', locations)
-      }
-    } catch (err) {
-      logger.error({ err }, 'Rider location broadcast failed')
-    }
-  }, 10000)
-
-  // Cleanup interval on close
+  // Cleanup on close
   fastify.addHook('onClose', () => {
-    clearInterval(riderLocationInterval)
     io.close()
   })
 

@@ -18,9 +18,9 @@ async function invalidateThemeCaches() {
   await redis.del(ACTIVE_THEME_CACHE_KEY)
   await redis.del(LEGACY_TAB_CACHE_KEY)
   await redis.del(getAdminTabThemesCacheKey())
-  await cacheDeletePattern('bakaloo:admin_theme_tabs:*')
-  await cacheDeletePattern('bakaloo:tab_manifest:*')
-  await cacheDeletePattern('bakaloo:tab_home:*')
+  await cacheDeletePattern('lndry:admin_theme_tabs:*')
+  await cacheDeletePattern('lndry:tab_manifest:*')
+  await cacheDeletePattern('lndry:tab_home:*')
 }
 
 function broadcastThemeUpdate(theme, themeId) {

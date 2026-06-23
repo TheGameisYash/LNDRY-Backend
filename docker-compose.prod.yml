@@ -34,7 +34,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in deploy/production/infra.env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/production/infra.env}
     volumes:
-      - ${POSTGRES_DATA_DIR:-/srv/bakaloo/postgres}:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_DIR:-/srv/lndry/postgres}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -53,7 +53,7 @@ services:
       - -ec
       - exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"
     volumes:
-      - ${REDIS_DATA_DIR:-/srv/bakaloo/redis}:/data
+      - ${REDIS_DATA_DIR:-/srv/lndry/redis}:/data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
       interval: 10s
@@ -98,12 +98,12 @@ services:
       REDIS_PORT: 6379
       BULL_REDIS_HOST: redis
       BULL_REDIS_PORT: 6379
-      WORKER_HEARTBEAT_FILE: /tmp/bakaloo-worker-heartbeat
+      WORKER_HEARTBEAT_FILE: /tmp/lndry-worker-heartbeat
     healthcheck:
       test:
         - CMD-SHELL
         - >-
-          node -e "const fs=require('fs');const p=process.env.WORKER_HEARTBEAT_FILE||'/tmp/bakaloo-worker-heartbeat';const age=Date.now()-fs.statSync(p).mtimeMs;process.exit(age < 90000 ? 0 : 1)"
+          node -e "const fs=require('fs');const p=process.env.WORKER_HEARTBEAT_FILE||'/tmp/lndry-worker-heartbeat';const age=Date.now()-fs.statSync(p).mtimeMs;process.exit(age < 90000 ? 0 : 1)"
       interval: 30s
       timeout: 5s
       retries: 5
@@ -152,8 +152,8 @@ services:
       TZ: ${TZ:-Asia/Kolkata}
       PGHOST: postgres
       PGPORT: 5432
-      PGDATABASE: ${POSTGRES_DB:-grocery_db}
-      PGUSER: ${POSTGRES_USER:-grocery_user}
+      PGDATABASE: ${POSTGRES_DB:-lndry_db}
+      PGUSER: ${POSTGRES_USER:-lndry_user}
       PGPASSWORD: ${POSTGRES_PASSWORD:-disabled}
       AWS_REGION: ${AWS_REGION:-ap-south-1}
       AWS_DEFAULT_REGION: ${AWS_REGION:-ap-south-1}
@@ -163,7 +163,7 @@ services:
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
       BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-0 */6 * * *}
     volumes:
-      - ${BACKUP_DIR:-/srv/bakaloo/backups}:/backups
+      - ${BACKUP_DIR:-/srv/lndry/backups}:/backups
     networks:
       - backend
 

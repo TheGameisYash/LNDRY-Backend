@@ -31,7 +31,7 @@ export async function sendSmsOtp(phone) {
   try {
     const cleanPhone = normalizePhone(phone)
     // Template: prefer TWO_FACTOR_TEMPLATE, fall back to TWO_FACTOR_SENDER (legacy alias).
-    const template = env.TWO_FACTOR_TEMPLATE || env.TWO_FACTOR_SENDER || 'GroceryAppOTP'
+    const template = env.TWO_FACTOR_TEMPLATE || env.TWO_FACTOR_SENDER || 'LndryAppOTP'
     // 2Factor API: GET /API/V1/{api_key}/SMS/{phone}/AUTOGEN/{template}
     const url = `${TWO_FACTOR_BASE}/${env.TWO_FACTOR_API_KEY}/SMS/${cleanPhone}/AUTOGEN/${template}`
 

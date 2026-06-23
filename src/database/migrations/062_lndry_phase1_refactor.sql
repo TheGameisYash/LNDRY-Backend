@@ -22,6 +22,15 @@ ALTER TABLE garment_types DROP COLUMN IF EXISTS sale_price;
 ALTER TABLE garment_types DROP COLUMN IF EXISTS description;
 ALTER TABLE garment_types DROP COLUMN IF EXISTS thumbnail_url;
 
+-- Update search trigger to exclude description
+CREATE OR REPLACE FUNCTION update_product_search()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.search_vector = to_tsvector('english', COALESCE(NEW.name, ''));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Ensure category_id exists and points to service_categories
 DO $$
 BEGIN
@@ -41,7 +50,7 @@ BEGIN
 END $$;
 
 ALTER TABLE vendor_employees DROP CONSTRAINT IF EXISTS chk_shop_staff_role;
-ALTER TABLE vendor_employees ADD CONSTRAINT chk_vendor_employees_role CHECK (role IN ('VENDOR_OWNER', 'VENDOR_EMPLOYEE'));
+ALTER TABLE vendor_employees ADD CONSTRAINT chk_vendor_employees_role CHECK (role IN ('VENDOR_OWNER', 'VENDOR_STAFF'));
 
 -- 4. CREATE vendor_service_rates TABLE
 CREATE TABLE IF NOT EXISTS vendor_service_rates (

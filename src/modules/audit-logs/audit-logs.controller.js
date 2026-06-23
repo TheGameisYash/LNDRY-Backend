@@ -64,9 +64,7 @@ export class AuditLogsController {
     const HQ_ROLES = new Set([
       'ADMIN',
       'SUPER_ADMIN',
-      'HQ_MANAGER',
-      'HQ_FINANCE',
-      'HQ_SUPPORT',
+      'FINANCE_ADMIN',
     ])
     const isHQ = HQ_ROLES.has(platformRole) || HQ_ROLES.has(role)
     const shopId = request.shopId || null

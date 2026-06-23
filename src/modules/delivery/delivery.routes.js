@@ -1,5 +1,9 @@
+// PHASE 1 SCOPE: No live tracking for customers. 
+// Rider uses external Google Maps for navigation.
+// Customer sees status timeline only (not GPS coordinates).
+
 // INTERNAL ONLY — Phase 1 excludes customer live-map. Do not expose to customer UI.
-// All routes in this module are restricted to authenticated DELIVERY_PARTNER / RIDER roles.
+// All routes in this module are restricted to authenticated RIDER roles.
 
 import { DeliveryController } from './delivery.controller.js'
 import { DeliveryService } from './delivery.service.js'
@@ -113,11 +117,10 @@ export default async function deliveryRoutes(fastify) {
   fastify.patch('/location', {
     schema: updateLocationSchema,
     preHandler: [async function requireRiderRole(request, reply) {
-      const role = request.user?.role
-      if (role !== 'DELIVERY_PARTNER' && role !== 'RIDER' && role !== 'ADMIN') {
+      if (request.user?.role !== 'RIDER') {
         return reply.code(403).send({
           success: false,
-          message: 'Forbidden — rider or admin role required',
+          message: 'Forbidden — rider role required',
           code: 'FORBIDDEN',
         })
       }

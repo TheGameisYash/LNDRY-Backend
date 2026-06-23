@@ -3,9 +3,9 @@ const { Pool } = pg;
 const pool = new Pool({
   host: 'localhost',
   port: 5432,
-  user: 'grocery_user',
-  password: 'grocery_password_dev',
-  database: 'grocery_db'
+  user: 'lndry_user',
+  password: 'lndry_password_dev',
+  database: 'lndry_db'
 });
 async function run() {
   try {

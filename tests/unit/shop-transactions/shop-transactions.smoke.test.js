@@ -257,7 +257,7 @@ describe('LedgerWriteService.append — first entry for a shop (Req 7.8)', () =>
     expect(result.balance_after).toBe('100.00')
     // Cache invalidation runs after the insert.
     expect(cacheDeletePattern).toHaveBeenCalledWith(
-      `bakaloo:shop-transactions:v1:${SHOP_ID}:*`
+      `lndry:shop-transactions:v1:${SHOP_ID}:*`
     )
   })
 
@@ -491,11 +491,11 @@ describe('ShopTransactionsService.list — pagination + caching', () => {
     expect(ttl).toBe(60)
   })
 
-  it('uses canonical cache key bakaloo:shop-transactions:v1:{shop}:p{page}:l{limit}', () => {
+  it('uses canonical cache key lndry:shop-transactions:v1:{shop}:p{page}:l{limit}', () => {
     const svc = new ShopTransactionsService(makeRepoMock())
 
     expect(svc.cacheKeyForList(SHOP_ID, { page: 1, limit: 50 })).toBe(
-      `bakaloo:shop-transactions:v1:${SHOP_ID}:p1:l50`
+      `lndry:shop-transactions:v1:${SHOP_ID}:p1:l50`
     )
 
     expect(
@@ -506,7 +506,7 @@ describe('ShopTransactionsService.list — pagination + caching', () => {
         reference_type: 'ORDER',
       })
     ).toBe(
-      `bakaloo:shop-transactions:v1:${SHOP_ID}:tORDER_REVENUE:rtORDER:p2:l100`
+      `lndry:shop-transactions:v1:${SHOP_ID}:tORDER_REVENUE:rtORDER:p2:l100`
     )
   })
 })
@@ -543,10 +543,8 @@ describe('ShopTransactionsService.getCurrentBalance', () => {
 describe('ShopTransactionsService.authorizeRead', () => {
   it.each([
     ['ADMIN', { id: USER_ID, role: 'ADMIN' }, true],
-    ['SHOP_ADMIN', { id: USER_ID, shopRole: 'SHOP_ADMIN' }, true],
-    ['SHOP_MANAGER', { id: USER_ID, shopRole: 'SHOP_MANAGER' }, true],
-    ['SHOP_STAFF', { id: USER_ID, shopRole: 'SHOP_STAFF' }, false],
-    ['SHOP_VIEWER', { id: USER_ID, shopRole: 'SHOP_VIEWER' }, false],
+    ['VENDOR_OWNER', { id: USER_ID, shopRole: 'VENDOR_OWNER' }, true],
+    ['VENDOR_STAFF', { id: USER_ID, shopRole: 'VENDOR_STAFF' }, true],
     ['CUSTOMER', { id: USER_ID, role: 'CUSTOMER' }, false],
     ['null actor', null, false],
   ])('authorizes %s correctly (Req 13.5)', (_label, actor, allowed) => {

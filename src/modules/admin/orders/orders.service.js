@@ -270,7 +270,7 @@ export class AdminOrdersService {
 
       // Get store location from app_settings (not hardcoded)
       let storeLat = 0, storeLng = 0
-      let storeName = 'Bakaloo Store', storeAddr = 'Pickup location', storePhone = ''
+      let storeName = 'LNDRY Store', storeAddr = 'Pickup location', storePhone = ''
       try {
         const { rows } = await dbQuery(
           `SELECT key, value FROM app_settings WHERE key IN ('store_lat', 'store_lng', 'store_name', 'store_address', 'store_phone')`

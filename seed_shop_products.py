@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Seed all products into the Bakaloo Demo Store for QA testing."""
+"""Seed all products into the LNDRY Demo Store for QA testing."""
 import urllib.request
 import urllib.error
 import json
 
-BASE = "https://bakaloo-api.shotlin.in/api/v1"
+BASE = "https://lndry-api.shotlin.in/api/v1"
 SHOP_ID = "dff3fede-28a4-4521-8fd8-35f0ae200c9d"
 
 def post(url, data, headers):
@@ -21,7 +21,7 @@ def get(url, headers=None):
         return json.loads(r.read())
 
 print("Getting admin token...")
-resp = post(f"{BASE}/admin/auth/login", {"email": "admin@bakaloo.com", "password": "Admin@123"}, {"Content-Type": "application/json"})
+resp = post(f"{BASE}/admin/auth/login", {"email": "admin@lndry.com", "password": "Admin@123"}, {"Content-Type": "application/json"})
 admin_token = resp["data"]["accessToken"]
 print(f"Admin token obtained ({len(admin_token)} chars)")
 

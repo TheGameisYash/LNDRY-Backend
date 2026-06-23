@@ -16,7 +16,7 @@ import { PERMISSIONS } from '../../utils/permissions.js'
  */
 
 /** Valid shop staff roles (Requirement 2.1, R16.8). */
-export const VALID_ROLES = ['VENDOR_OWNER', 'VENDOR_EMPLOYEE']
+export const VALID_ROLES = ['VENDOR_OWNER', 'VENDOR_STAFF']
 
 /**
  * Canonical Permission_String enum used by every staff create/update body

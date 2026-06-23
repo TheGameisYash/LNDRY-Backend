@@ -25,7 +25,7 @@ describe('Tenant Isolation Unit Tests', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] }) // Not owner
     // Second query check is for vendor employee
     mockQuery.mockResolvedValueOnce({
-      rows: [{ vendor_id: VENDOR_A, role: 'VENDOR_EMPLOYEE' }]
+      rows: [{ vendor_id: VENDOR_A, role: 'VENDOR_STAFF' }]
     })
 
     // 2. Mock getOrder query to return nothing because VENDOR_A is querying ORDER_B

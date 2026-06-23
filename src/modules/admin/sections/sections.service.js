@@ -7,9 +7,9 @@ import { SectionsRepository } from './sections.repository.js'
 const repo = new SectionsRepository()
 
 async function invalidateSectionCaches() {
-  await cacheDeletePattern('bakaloo:sections:*')
-  await cacheDeletePattern('bakaloo:tab_home:*')
-  await cacheDeletePattern('bakaloo:tab_manifest:*')
+  await cacheDeletePattern('lndry:sections:*')
+  await cacheDeletePattern('lndry:tab_home:*')
+  await cacheDeletePattern('lndry:tab_manifest:*')
 }
 
 function broadcastSectionUpdate(tabKey) {

@@ -12,7 +12,7 @@ import {
  * Resolution order:
  *   1. URL param `:shopId` — set when routes are mounted under
  *      `/vendors/:shopId/staff` (the dashboard's canonical pattern, see
- *      bakaloo-dashboard/src/services/shop-staff.service.ts). Wins over
+ *      lndry-dashboard/src/services/shop-staff.service.ts). Wins over
  *      headers/JWT so a Super Admin operating on shop A can't accidentally
  *      hit shop B by leaving a stale X-Shop-Id header set.
  *   2. JWT vendor_id (request.user.shopId or request.user.vendor_id) — set after

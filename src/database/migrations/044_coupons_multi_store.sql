@@ -184,8 +184,8 @@
 -- Append-only contract (R26 AC#4, design §12.4 + §17 "Property 7"):
 --   * The application path only INSERTs and SELECTs `coupon_usages` —
 --     never UPDATE, never DELETE. The application PostgreSQL role
---     (`bakaloo_app`) is granted INSERT+SELECT only on this table; ALL
---     is reserved for the migration role (`bakaloo_admin`). This is
+--     (`lndry_app`) is granted INSERT+SELECT only on this table; ALL
+--     is reserved for the migration role (`lndry_admin`). This is
 --     enforced at deploy time (design §10 + §12.4) and re-checked by a
 --     static grep in CI (design §17 Property 7).
 --   * The R26 AC#11 "cap to 0" rule does NOT mutate an existing usage

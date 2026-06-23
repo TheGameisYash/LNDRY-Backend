@@ -235,7 +235,7 @@ ALTER TABLE rider_profiles ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100);
 -- 11. SEED ADDITIONAL APP SETTINGS
 -- ═══════════════════════════════════════════════════════════════
 INSERT INTO app_settings (key, value, description) VALUES
-  ('store_name',           '"Bakaloo"',              'Store display name'),
+  ('store_name',           '"LNDRY"',              'Store display name'),
   ('store_gstin',          '"27AAAAA0000A1Z5"',     'GST number for invoices'),
   ('loyalty_rate',         '1',                     'Loyalty points per Rs.1 spent'),
   ('loyalty_value',        '0.01',                  'Value of 1 point in Rs.'),

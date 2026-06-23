@@ -21,7 +21,7 @@ INSERT INTO app_settings (key, value, description) VALUES
   ('app_maintenance',    'false',       'App maintenance mode'),
   ('app_version',        '"1.0.0"',     'Current app version'),
   ('support_phone',      '"+919775845587"', 'Customer support phone'),
-  ('support_email',      '"support@groceryapp.com"', 'Customer support email')
+  ('support_email',      '"support@lndryapp.com"', 'Customer support email')
 ON CONFLICT (key) DO NOTHING;
 
 -- ─── USER BLOCKING ──────────────────────────────────

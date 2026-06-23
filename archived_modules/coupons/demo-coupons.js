@@ -1,7 +1,7 @@
 const DEMO_COUPONS = [
   {
-    id: 'demo-coupon-bakaloo50',
-    code: 'BAKALOO50',
+    id: 'demo-coupon-lndry50',
+    code: 'LNDRY50',
     description: 'Flat ₹50 off on fresh groceries above ₹499',
     discountType: 'FLAT',
     discountValue: 50,

@@ -64,8 +64,8 @@ vi.mock('../../src/utils/cache.js', () => ({
 }))
 
 vi.mock('../../src/modules/themes/theme-cache.js', () => ({
-  ACTIVE_THEME_CACHE_KEY: 'bakaloo:active_theme',
-  LEGACY_TAB_CACHE_KEY: 'bakaloo:legacy_tab',
+  ACTIVE_THEME_CACHE_KEY: 'lndry:active_theme',
+  LEGACY_TAB_CACHE_KEY: 'lndry:legacy_tab',
 }))
 
 // ─── Import SUT after mocks ──────────────────────────────────────────

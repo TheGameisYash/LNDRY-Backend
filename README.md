@@ -1,4 +1,4 @@
-# Grocery App — Fastify Backend
+# LNDRY Platform — Fastify Backend
 
 ## Prerequisites
 

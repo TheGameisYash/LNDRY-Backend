@@ -18,7 +18,7 @@
 //   - 3 attempts with exponential backoff (queue defaults)
 //   - Per-job target: complete within 30s
 //
-// Cache key format: `bakaloo:reports:{reportType}:v1:{paramHash}`
+// Cache key format: `lndry:reports:{reportType}:v1:{paramHash}`
 // TTL: 5 minutes (300s) — reports are pre-computed frequently enough
 // that stale data is acceptable for dashboard views.
 
@@ -28,7 +28,7 @@ import { redis } from '../config/redis.js'
 import { query } from '../config/database.js'
 
 const REPORT_CACHE_TTL = 300 // 5 minutes
-const REPORT_CACHE_PREFIX = 'bakaloo:reports'
+const REPORT_CACHE_PREFIX = 'lndry:reports'
 
 /**
  * Compute a deterministic cache key for a report.

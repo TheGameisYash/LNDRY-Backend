@@ -19,7 +19,7 @@ import { ERROR_CODES } from '../../constants/errors.js'
  * SELECT FOR UPDATE row-level locking on stock writes.
  *
  * Caching (Requirement 14.3):
- *   - Listing pages cached at  bakaloo:shop-garment_rates:v1:{vendor_id}:p{page}:l{limit}:...
+ *   - Listing pages cached at  lndry:shop-garment_rates:v1:{vendor_id}:p{page}:l{limit}:...
  *   - TTL: 120 seconds
  *   - Any write (create/update/stock/delete) invalidates ALL pages for the shop
  *     via a SCAN-based pattern delete (never KEYS *).
@@ -53,7 +53,7 @@ import { ERROR_CODES } from '../../constants/errors.js'
  * service is available the call is a no-op (best-effort).
  */
 
-const CACHE_PREFIX = 'bakaloo:shop-garment_rates:v1'
+const CACHE_PREFIX = 'lndry:shop-garment_rates:v1'
 const CACHE_TTL_SECONDS = 120
 const STAFF_ROLES_ALLOWED_TO_MUTATE = new Set([
   'SHOP_ADMIN',

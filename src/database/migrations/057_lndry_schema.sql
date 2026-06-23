@@ -1,12 +1,12 @@
 -- Migration 057: LNDRY laundry service booking and fulfilment domain schema
 -- Rename existing retail/grocery tables, add slots, OTPs, TOTP, and watermark settings.
 
--- Extend role enum with VENDOR_OWNER, VENDOR_STAFF, and DELIVERY_PARTNER
+-- Extend role enum with VENDOR_OWNER, VENDOR_STAFF, and RIDER
 DO $$
 BEGIN
   ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'VENDOR_OWNER';
   ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'VENDOR_STAFF';
-  ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'DELIVERY_PARTNER';
+  ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'RIDER';
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;

@@ -81,7 +81,7 @@ function makeRepoMock() {
 const VALID_CREATE_PAYLOAD = {
   vendor_id: SHOP_ID,
   user_id: TARGET_USER_ID,
-  role: 'VENDOR_EMPLOYEE',
+  role: 'VENDOR_STAFF',
   permissions: ['shop_orders.view', 'vendor_services.view'],
 }
 
@@ -89,7 +89,7 @@ const MOCK_STAFF_RECORD = {
   id: STAFF_ID,
   user_id: TARGET_USER_ID,
   vendor_id: SHOP_ID,
-  role: 'VENDOR_EMPLOYEE',
+  role: 'VENDOR_STAFF',
   permissions: ['shop_orders.view', 'vendor_services.view'],
   is_active: true,
   invited_by: REQUESTER_ID,
@@ -209,20 +209,20 @@ describe('VendorEmployeesService.create() — limits and constraints', () => {
     expect(repo.create).toHaveBeenCalledWith({
       user_id: TARGET_USER_ID,
       vendor_id: SHOP_ID,
-      role: 'VENDOR_EMPLOYEE',
+      role: 'VENDOR_STAFF',
       permissions: ['shop_orders.view', 'vendor_services.view'],
       invited_by: REQUESTER_ID,
     })
   })
 
-  it('defaults permissions to the VENDOR_EMPLOYEE default set when caller provides none', async () => {
+  it('defaults permissions to the VENDOR_STAFF default set when caller provides none', async () => {
     repo.findByUserAndShop.mockResolvedValueOnce(null)
     repo.countActiveByShop.mockResolvedValueOnce(0)
     repo.countActiveByUser.mockResolvedValueOnce(0)
     repo.create.mockResolvedValueOnce({ ...MOCK_STAFF_RECORD, permissions: [] })
 
     await service.create(
-      { vendor_id: SHOP_ID, user_id: TARGET_USER_ID, role: 'VENDOR_EMPLOYEE' },
+      { vendor_id: SHOP_ID, user_id: TARGET_USER_ID, role: 'VENDOR_STAFF' },
       REQUESTER_ID
     )
 
@@ -263,7 +263,7 @@ describe('VendorEmployeesService.create() — R20 new-user shape', () => {
         vendor_id: SHOP_ID,
         email: 'sam@example.com',
         name: 'Sam',
-        role: 'VENDOR_EMPLOYEE',
+        role: 'VENDOR_STAFF',
         generate_temp_password: true,
       },
       { invitedBy: REQUESTER_ID, invitedByPlatformRole: 'ADMIN' }
@@ -299,7 +299,7 @@ describe('VendorEmployeesService.create() — R20 new-user shape', () => {
           vendor_id: SHOP_ID,
           email: 'taken@example.com',
           name: 'Sam',
-          role: 'VENDOR_EMPLOYEE',
+          role: 'VENDOR_STAFF',
           generate_temp_password: true,
         },
         { invitedBy: REQUESTER_ID, invitedByPlatformRole: 'ADMIN' }
@@ -315,7 +315,7 @@ describe('VendorEmployeesService.create() — R20 new-user shape', () => {
           vendor_id: SHOP_ID,
           email: 'sam2@example.com',
           name: 'Sam',
-          role: 'VENDOR_EMPLOYEE',
+          role: 'VENDOR_STAFF',
           permissions: ['vendor_services.view', 'made.up.permission'],
           generate_temp_password: true,
         },
@@ -346,12 +346,12 @@ describe('VendorEmployeesService.create() — role-creation rules (R16.9–R16.1
     })
   })
 
-  it('VENDOR_EMPLOYEE cannot create VENDOR_OWNER or VENDOR_EMPLOYEE', async () => {
-    for (const role of ['VENDOR_OWNER', 'VENDOR_EMPLOYEE']) {
+  it('VENDOR_STAFF cannot create VENDOR_OWNER or VENDOR_STAFF', async () => {
+    for (const role of ['VENDOR_OWNER', 'VENDOR_STAFF']) {
       await expect(
         service.create(
           { ...VALID_CREATE_PAYLOAD, role },
-          { invitedBy: REQUESTER_ID, invitedByRole: 'VENDOR_EMPLOYEE' }
+          { invitedBy: REQUESTER_ID, invitedByRole: 'VENDOR_STAFF' }
         )
       ).rejects.toMatchObject({
         statusCode: 403,
@@ -360,7 +360,7 @@ describe('VendorEmployeesService.create() — role-creation rules (R16.9–R16.1
     }
   })
 
-  it('HQ_MANAGER may create VENDOR_OWNER', async () => {
+  it('ADMIN may create VENDOR_OWNER', async () => {
     repo.findByUserAndShop.mockResolvedValueOnce(null)
     repo.countActiveByShop.mockResolvedValueOnce(0)
     repo.countActiveByUser.mockResolvedValueOnce(0)
@@ -371,7 +371,7 @@ describe('VendorEmployeesService.create() — role-creation rules (R16.9–R16.1
 
     const result = await service.create(
       { ...VALID_CREATE_PAYLOAD, role: 'VENDOR_OWNER' },
-      { invitedBy: REQUESTER_ID, invitedByPlatformRole: 'HQ_MANAGER' }
+      { invitedBy: REQUESTER_ID, invitedByPlatformRole: 'ADMIN' }
     )
     expect(result.success).toBe(true)
   })
@@ -398,7 +398,7 @@ describe('VendorEmployeesService.list()', () => {
     const result = await service.list(SHOP_ID, {
       page: 2,
       limit: 50,
-      role: 'VENDOR_EMPLOYEE',
+      role: 'VENDOR_STAFF',
       is_active: 'true',
     })
 
@@ -406,7 +406,7 @@ describe('VendorEmployeesService.list()', () => {
       shopId: SHOP_ID,
       page: 2,
       limit: 50,
-      role: 'VENDOR_EMPLOYEE',
+      role: 'VENDOR_STAFF',
       is_active: 'true',
     })
     expect(result).toEqual({
@@ -564,7 +564,7 @@ describe('createVendorEmployeeSchema — permissions and role validation', () =>
   const VALID_BASE = {
     vendor_id: SHOP_ID,
     user_id: TARGET_USER_ID,
-    role: 'VENDOR_EMPLOYEE',
+    role: 'VENDOR_STAFF',
   }
 
   it('lists exactly the canonical 37 Permission_Strings', () => {
@@ -577,7 +577,7 @@ describe('createVendorEmployeeSchema — permissions and role validation', () =>
   it('lists exactly the 2 staff roles from target structure', () => {
     expect(VALID_ROLES).toEqual([
       'VENDOR_OWNER',
-      'VENDOR_EMPLOYEE',
+      'VENDOR_STAFF',
     ])
   })
 
@@ -650,7 +650,7 @@ describe('createVendorEmployeeSchema — permissions and role validation', () =>
       vendor_id: SHOP_ID,
       email: 'NewStaff@Example.com',
       name: 'New Staff',
-      role: 'VENDOR_EMPLOYEE',
+      role: 'VENDOR_STAFF',
       generate_temp_password: true,
     })
     expect(parsed.success).toBe(true)
@@ -664,7 +664,7 @@ describe('createVendorEmployeeSchema — permissions and role validation', () =>
     const parsed = createVendorEmployeeSchema.safeParse({
       vendor_id: SHOP_ID,
       name: 'New Staff',
-      role: 'VENDOR_EMPLOYEE',
+      role: 'VENDOR_STAFF',
     })
     expect(parsed.success).toBe(false)
   })
@@ -674,7 +674,7 @@ describe('createVendorEmployeeSchema — permissions and role validation', () =>
       vendor_id: SHOP_ID,
       email: 'a@b.com',
       name: 'A B',
-      role: 'VENDOR_EMPLOYEE',
+      role: 'VENDOR_STAFF',
       generate_temp_password: false,
       password: 'aaaaaaaa', // letters only, no digit
     })

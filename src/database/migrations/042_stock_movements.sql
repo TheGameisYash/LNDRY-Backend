@@ -9,9 +9,9 @@
 --
 -- Append-only contract (R23 AC#3, design §17 "Property 6"):
 --   * Application paths only INSERT and SELECT — never UPDATE, never
---     DELETE. The application PostgreSQL role (`bakaloo_app`) is granted
+--     DELETE. The application PostgreSQL role (`lndry_app`) is granted
 --     INSERT+SELECT only on this table; ALL is reserved for the
---     migration role (`bakaloo_admin`). This is enforced at deploy time
+--     migration role (`lndry_admin`). This is enforced at deploy time
 --     (design §10) and re-checked by a static grep in CI (design §17).
 --   * The `COMMENT ON TABLE` below is the in-database reminder of that
 --     contract; reviewers and DBAs see it via `\d+ stock_movements`.

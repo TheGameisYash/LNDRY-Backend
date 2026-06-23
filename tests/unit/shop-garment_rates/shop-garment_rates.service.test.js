@@ -325,7 +325,7 @@ describe('ShopProductsService.create', () => {
 
     expect(cacheDeletePattern).toHaveBeenCalledTimes(1)
     expect(cacheDeletePattern).toHaveBeenCalledWith(
-      `bakaloo:shop-garment_rates:v1:${SHOP_ID}:*`
+      `lndry:shop-garment_rates:v1:${SHOP_ID}:*`
     )
   })
 
@@ -441,7 +441,7 @@ describe('ShopProductsService.update', () => {
 
     expect(result.success).toBe(true)
     expect(cacheDeletePattern).toHaveBeenCalledWith(
-      `bakaloo:shop-garment_rates:v1:${SHOP_ID}:*`
+      `lndry:shop-garment_rates:v1:${SHOP_ID}:*`
     )
   })
 
@@ -752,7 +752,7 @@ describe('ShopProductsService.delete', () => {
     expect(result).toEqual({ success: true })
     expect(repo.softDelete).toHaveBeenCalledWith(SHOP_PRODUCT_ID, SHOP_ID)
     expect(cacheDeletePattern).toHaveBeenCalledWith(
-      `bakaloo:shop-garment_rates:v1:${SHOP_ID}:*`
+      `lndry:shop-garment_rates:v1:${SHOP_ID}:*`
     )
   })
 
@@ -823,11 +823,11 @@ describe('ShopProductsService.list (pagination + caching)', () => {
     expect(ttl).toBe(120)
   })
 
-  it('uses canonical cache key bakaloo:shop-garment_rates:v1:{vendor_id}:p{page}:l{limit}…', () => {
+  it('uses canonical cache key lndry:shop-garment_rates:v1:{vendor_id}:p{page}:l{limit}…', () => {
     const svc = new ShopProductsService(makeRepoMock())
 
     expect(svc.cacheKeyForList(SHOP_ID, { page: 1, limit: 20 })).toBe(
-      `bakaloo:shop-garment_rates:v1:${SHOP_ID}:p1:l20`
+      `lndry:shop-garment_rates:v1:${SHOP_ID}:p1:l20`
     )
 
     // Optional filters appended in a stable order
@@ -841,7 +841,7 @@ describe('ShopProductsService.list (pagination + caching)', () => {
         includeDeleted: true,
       })
     ).toBe(
-      `bakaloo:shop-garment_rates:v1:${SHOP_ID}:p2:l50:atrue:lstrue:smilk:inc-del`
+      `lndry:shop-garment_rates:v1:${SHOP_ID}:p2:l50:atrue:lstrue:smilk:inc-del`
     )
   })
 })

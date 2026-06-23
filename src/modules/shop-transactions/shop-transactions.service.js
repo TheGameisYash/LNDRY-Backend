@@ -32,11 +32,11 @@ import {
  * and this service exposes no API for mutating existing rows.
  */
 
-const CACHE_PREFIX = 'bakaloo:shop-transactions:v1'
+const CACHE_PREFIX = 'lndry:shop-transactions:v1'
 const CACHE_TTL_SECONDS = 60
 
 const READ_ROLES_PLATFORM = new Set(['ADMIN'])
-const READ_ROLES_SHOP = new Set(['SHOP_ADMIN', 'SHOP_MANAGER'])
+const READ_ROLES_SHOP = new Set(['VENDOR_OWNER', 'VENDOR_STAFF'])
 
 // ─── Decimal helpers ─────────────────────────────────────
 // We work in integer cents to dodge IEEE-754 rounding when summing dozens of
@@ -104,7 +104,7 @@ export class ShopTransactionsService {
   // ── Cache helpers ────────────────────────────────────
   /**
    * Build the canonical cache key for a list response.
-   * Format: bakaloo:shop-transactions:v1:{vendor_id}[:t{type}][:rt{ref_type}][:r{ref_id}][:f{from}][:t2{to}]:p{page}:l{limit}
+   * Format: lndry:shop-transactions:v1:{vendor_id}[:t{type}][:rt{ref_type}][:r{ref_id}][:f{from}][:t2{to}]:p{page}:l{limit}
    */
   cacheKeyForList(shopId, filters) {
     const parts = [`${CACHE_PREFIX}:${shopId}`]

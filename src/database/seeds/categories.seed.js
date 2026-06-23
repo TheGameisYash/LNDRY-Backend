@@ -20,7 +20,7 @@ export async function seedCategories(pool) {
 
   for (const cat of categories) {
     await pool.query(
-      `INSERT INTO categories (id, name, slug, description, sort_order, is_active)
+      `INSERT INTO service_categories (id, name, slug, description, sort_order, is_active)
        VALUES ($1, $2, $3, $4, $5, true)
        ON CONFLICT (slug) DO NOTHING`,
       [cat.id, cat.name, cat.slug, cat.description, cat.sort_order]

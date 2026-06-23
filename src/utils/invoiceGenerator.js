@@ -32,7 +32,7 @@ export function generateInvoicePDF(order) {
     doc
       .fontSize(10)
       .font('Helvetica')
-      .text('Bakaloo Laundry Service', { align: 'center' })
+      .text('LNDRY Laundry Service', { align: 'center' })
       .moveDown(1.5)
 
     // ─── Order Info ───────────────────────────────────
@@ -134,7 +134,7 @@ export function generateInvoicePDF(order) {
     doc
       .fontSize(8)
       .font('Helvetica')
-      .text('Thank you for choosing Bakaloo Laundry Service!', 50, doc.y, { align: 'center' })
+      .text('Thank you for choosing LNDRY Laundry Service!', 50, doc.y, { align: 'center' })
       .text('This is a computer-generated invoice.', { align: 'center' })
 
     doc.end()

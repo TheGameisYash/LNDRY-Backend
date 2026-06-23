@@ -1,4 +1,4 @@
-# 🧪 GROCERY APP — COMPLETE API TESTING GUIDE
+# 🧪 LNDRY PLATFORM — COMPLETE API TESTING GUIDE
 
 > **Total Endpoints:** 60+ | **Modules:** 11 | **Covers:** Weeks 1–4  
 > **Base URL:** `http://localhost:3000`  
@@ -1023,8 +1023,8 @@ curl -X POST http://localhost:3000/api/v1/uploads/image \
   "success": true,
   "message": "Image uploaded",
   "data": {
-    "url": "https://res.cloudinary.com/dxxxxxx/image/upload/v1708/grocery-app-dev/products/abc123.webp",
-    "publicId": "grocery-app-dev/products/abc123",
+    "url": "https://res.cloudinary.com/dxxxxxx/image/upload/v1708/lndry-app-dev/products/abc123.webp",
+    "publicId": "lndry-app-dev/products/abc123",
     "width": 800,
     "height": 600,
     "format": "webp",
@@ -1074,7 +1074,7 @@ curl -X POST http://localhost:3000/api/v1/uploads/images \
 curl -X DELETE http://localhost:3000/api/v1/uploads/image \
   -H "Authorization: Bearer <adminToken>" \
   -H "Content-Type: application/json" \
-  -d '{ "publicId": "grocery-app-dev/products/abc123" }'
+  -d '{ "publicId": "lndry-app-dev/products/abc123" }'
 ```
 
 **✅ 200** — `{ "success": true, "message": "Image deleted", "data": null }`
@@ -2466,4 +2466,4 @@ Follow this sequence to test the full customer journey:
 
 ---
 
-*Generated: 20 February 2026 | Grocery Backend v1.0 — Weeks 1–4 Complete*
+*Generated: 20 February 2026 | LNDRY Backend v1.0 — Weeks 1–4 Complete*

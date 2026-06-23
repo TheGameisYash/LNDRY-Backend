@@ -16,7 +16,7 @@ async function rateLimitPlugin(fastify) {
     global: false,
     redis,
     hook: 'onRequest',
-    nameSpace: 'bakaloo:ratelimit:',
+    nameSpace: 'lndry:ratelimit:',
     max: env.RATE_LIMIT_MAX,
     timeWindow: env.RATE_LIMIT_WINDOW,
     skipOnError: true,

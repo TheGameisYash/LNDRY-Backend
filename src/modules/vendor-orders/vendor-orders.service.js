@@ -526,7 +526,7 @@ export class VendorOrdersService {
        JOIN users u ON ve.user_id = u.id
        WHERE ve.vendor_id = $1
          AND ve.is_active = true
-         AND ve.role = 'VENDOR_EMPLOYEE'
+         AND ve.role = 'VENDOR_STAFF'
        ORDER BY active_jobs ASC, ve.created_at ASC
        LIMIT 1`,
       [vendorId]

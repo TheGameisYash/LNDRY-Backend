@@ -143,7 +143,7 @@ export class ShopReportsController {
     const shopId = request.shopId
     const { report, ...filters } = request.query
     const data = await this.service.getExportData(shopId, report, filters)
-    const filename = `bakaloo-shop-${report}-${new Date().toISOString().slice(0, 10)}.csv`
+    const filename = `lndry-shop-${report}-${new Date().toISOString().slice(0, 10)}.csv`
     streamCsvResponse(reply, data, filename)
   }
 }

@@ -201,9 +201,9 @@ async function handleScheduledActivation({ themeId }) {
 
     await redis.del(ACTIVE_THEME_CACHE_KEY)
     await redis.del(LEGACY_TAB_CACHE_KEY)
-    await cacheDeletePattern('bakaloo:tab_manifest:*')
-    await cacheDeletePattern('bakaloo:tab_home:*')
-    await cacheDeletePattern('bakaloo:admin_theme_tabs:*')
+    await cacheDeletePattern('lndry:tab_manifest:*')
+    await cacheDeletePattern('lndry:tab_home:*')
+    await cacheDeletePattern('lndry:admin_theme_tabs:*')
 
     const io = getSocketIo()
     if (io) {
@@ -316,9 +316,9 @@ async function handleApplySectionLayout({ versionId, tabId }) {
 
     await client.query('COMMIT')
 
-    await cacheDeletePattern('bakaloo:sections:*')
-    await cacheDeletePattern('bakaloo:tab_manifest:*')
-    await cacheDeletePattern('bakaloo:tab_home:*')
+    await cacheDeletePattern('lndry:sections:*')
+    await cacheDeletePattern('lndry:tab_manifest:*')
+    await cacheDeletePattern('lndry:tab_home:*')
 
     const io = getSocketIo()
     if (io) {
@@ -617,7 +617,7 @@ async function handleAutoAssign({ orderId, source = 'SYSTEM' }) {
   }
 
   // LNDRY Workload-Based Employee Selection:
-  // Lookup active same-vendor employees (role = 'VENDOR_EMPLOYEE') with their active workload.
+  // Lookup active same-vendor staff (role = 'VENDOR_STAFF') with their active workload.
   const { rows: candidateEmployees } = await query(
     `SELECT ve.user_id,
             rp.current_lat, rp.current_lng,
@@ -632,7 +632,7 @@ async function handleAutoAssign({ orderId, source = 'SYSTEM' }) {
          AND oa.status IN ('ASSIGNED', 'ACCEPTED', 'IN_TRANSIT')
      ) workload ON true
      WHERE ve.vendor_id = $1
-       AND ve.role = 'VENDOR_EMPLOYEE'
+       AND ve.role = 'VENDOR_STAFF'
        AND ve.is_active = true
        AND ve.deleted_at IS NULL
        AND u.is_active = true
@@ -985,7 +985,7 @@ async function getStoreSettings() {
   const settings = {
     lat: 0,
     lng: 0,
-    name: 'Bakaloo Store',
+    name: 'LNDRY Store',
     address: 'Pickup location',
     phone: '',
   }

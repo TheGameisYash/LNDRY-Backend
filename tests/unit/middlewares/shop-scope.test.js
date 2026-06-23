@@ -60,9 +60,9 @@ beforeEach(() => {
 // Cache key shape
 // ═══════════════════════════════════════════════════════════════
 describe('staffActiveCacheKey', () => {
-  it('produces the documented bakaloo:staff-active:v1:{user}:{shop} pattern', () => {
+  it('produces the documented lndry:staff-active:v1:{user}:{shop} pattern', () => {
     expect(staffActiveCacheKey(STAFF_USER_ID, SHOP_ID)).toBe(
-      `bakaloo:staff-active:v1:${STAFF_USER_ID}:${SHOP_ID}`
+      `lndry:staff-active:v1:${STAFF_USER_ID}:${SHOP_ID}`
     )
   })
 })
@@ -71,7 +71,7 @@ describe('invalidateStaffActiveCache', () => {
   it('deletes the matching cache key', async () => {
     await invalidateStaffActiveCache(STAFF_USER_ID, SHOP_ID)
     expect(cacheDel).toHaveBeenCalledWith(
-      `bakaloo:staff-active:v1:${STAFF_USER_ID}:${SHOP_ID}`
+      `lndry:staff-active:v1:${STAFF_USER_ID}:${SHOP_ID}`
     )
   })
 
@@ -124,7 +124,7 @@ describe('requireShopScope — staff JWT', () => {
     expect(req.shopId).toBe(SHOP_ID)
     expect(query).toHaveBeenCalledTimes(1)
     expect(cacheSet).toHaveBeenCalledWith(
-      `bakaloo:staff-active:v1:${STAFF_USER_ID}:${SHOP_ID}`,
+      `lndry:staff-active:v1:${STAFF_USER_ID}:${SHOP_ID}`,
       true,
       300
     )
@@ -159,7 +159,7 @@ describe('requireShopScope — staff JWT', () => {
     expect(reply.payload.code).toBe('STAFF_INACTIVE')
     // Caches the negative result so subsequent rejects skip DB.
     expect(cacheSet).toHaveBeenCalledWith(
-      `bakaloo:staff-active:v1:${STAFF_USER_ID}:${SHOP_ID}`,
+      `lndry:staff-active:v1:${STAFF_USER_ID}:${SHOP_ID}`,
       false,
       300
     )

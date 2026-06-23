@@ -238,7 +238,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
               id: STAFF_RECORD_ID,
               vendor_id: SHOP_ID,
               user_id: '22222222-2222-2222-2222-222222222222',
-              role: 'VENDOR_EMPLOYEE',
+              role: 'VENDOR_STAFF',
               permissions: [],
               is_active: true,
             }],
@@ -250,7 +250,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
               id: STAFF_RECORD_ID,
               vendor_id: SHOP_ID,
               user_id: '22222222-2222-2222-2222-222222222222',
-              role: 'VENDOR_EMPLOYEE',
+              role: 'VENDOR_STAFF',
               permissions: [],
               is_active: true,
             }],
@@ -263,7 +263,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
         query: vi.fn().mockResolvedValue({
           rows: [{
             id: STAFF_RECORD_ID,
-            role: 'VENDOR_EMPLOYEE',
+            role: 'VENDOR_STAFF',
             permissions: [],
             is_active: true,
           }],
@@ -279,7 +279,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
           authorization: `Bearer ${token}`,
           'x-shop-id': SHOP_ID,
         },
-        payload: { role: 'VENDOR_EMPLOYEE' },
+        payload: { role: 'VENDOR_STAFF' },
       })
 
       // Should not be a validation error — may be 200 or 404 depending
@@ -303,7 +303,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
           authorization: `Bearer ${token}`,
           'x-shop-id': SHOP_ID,
         },
-        payload: { role: 'VENDOR_EMPLOYEE' },
+        payload: { role: 'VENDOR_STAFF' },
       })
 
       expect(res.statusCode).toBe(405)
@@ -345,7 +345,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
       const res = await app.inject({
         method: 'PUT',
         url: `/api/v1/vendor-employees/${STAFF_RECORD_ID}`,
-        payload: { role: 'VENDOR_EMPLOYEE' },
+        payload: { role: 'VENDOR_STAFF' },
       })
 
       // Unauthenticated users see 401 before 405 — security first
@@ -367,7 +367,7 @@ describe('Shop Staff method validation (Task 23.3)', () => {
         headers: {
           authorization: `Bearer ${token}`,
         },
-        payload: { role: 'VENDOR_EMPLOYEE' },
+        payload: { role: 'VENDOR_STAFF' },
       })
 
       expect(res.statusCode).toBe(405)

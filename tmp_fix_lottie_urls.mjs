@@ -16,12 +16,12 @@ cloudinary.config({
 const uploads = [
   {
     tab: 'all',
-    file: '../bakaloo_customer/assets/lottie/summer_banner.lottie',
+    file: '../lndry_customer/assets/lottie/summer_banner.lottie',
     filename: 'summer_banner.lottie',
   },
   {
     tab: 'navratri',
-    file: '../bakaloo_customer/assets/lottie/puja.lottie',
+    file: '../lndry_customer/assets/lottie/puja.lottie',
     filename: 'puja.lottie',
   },
 ]
@@ -43,7 +43,7 @@ try {
       const stream = cloudinary.uploader.upload_stream(
         {
           resource_type: 'raw',
-          folder: 'bakaloo/theme-assets',
+          folder: 'lndry/theme-assets',
           public_id: item.filename,
         },
         (err, res) => (err ? reject(err) : resolve(res))
@@ -65,8 +65,8 @@ try {
     console.log(JSON.stringify({ tab: item.tab, url: result.secure_url }))
   }
 
-  await cacheDeletePattern('bakaloo:sections:*')
-  await cacheDeletePattern('bakaloo:theme:*')
+  await cacheDeletePattern('lndry:sections:*')
+  await cacheDeletePattern('lndry:theme:*')
 } finally {
   await client.end()
 }

@@ -150,7 +150,7 @@ function buildCostPrice(price, salePrice) {
 }
 
 function buildMetaTitle(product) {
-  return `${product.name} | ${product.brand} | Bakaloo`
+  return `${product.name} | ${product.brand} | LNDRY`
 }
 
 function buildMetaDescription(product) {

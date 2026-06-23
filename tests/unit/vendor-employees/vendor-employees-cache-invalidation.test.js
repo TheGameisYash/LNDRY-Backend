@@ -72,14 +72,14 @@ describe('VendorEmployeesService.update — cache invalidation', () => {
       id: STAFF_ID,
       user_id: TARGET_USER_ID,
       vendor_id: SHOP_ID,
-      role: 'VENDOR_EMPLOYEE',
+      role: 'VENDOR_STAFF',
       is_active: true,
     })
     repo.update.mockResolvedValueOnce({
       id: STAFF_ID,
       user_id: TARGET_USER_ID,
       vendor_id: SHOP_ID,
-      role: 'VENDOR_EMPLOYEE',
+      role: 'VENDOR_STAFF',
       is_active: false,
     })
     const service = new VendorEmployeesService(repo)

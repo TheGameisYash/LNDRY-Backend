@@ -154,7 +154,7 @@ export class AdminReportsController {
   async exportCsv(request, reply) {
     const { report, ...filters } = request.query
     const data = await this.service.getExportData(report, filters)
-    const filename = `bakaloo-${report}-${new Date().toISOString().slice(0, 10)}.csv`
+    const filename = `lndry-${report}-${new Date().toISOString().slice(0, 10)}.csv`
     streamCsvResponse(reply, data, filename)
   }
 }

@@ -3,7 +3,7 @@ import { logger } from '../../config/logger.js'
 import { emit as emitAudit } from '../../utils/audit-log.js'
 import { allocationQueue } from '../../config/bullmq.js'
 
-const CACHE_PREFIX = 'bakaloo:vendors:v1'
+const CACHE_PREFIX = 'lndry:vendors:v1'
 const CACHE_TTL = 300 // 300 seconds
 
 /**
@@ -105,7 +105,7 @@ export class ShopsService {
     })
 
     // Invalidate active vendors list cache
-    await cacheDeletePattern('bakaloo:vendors:active:*')
+    await cacheDeletePattern('lndry:vendors:active:*')
 
     logger.info({ userId, shopId: shop.id, action: 'shop_created' }, 'Shop created')
 
@@ -184,7 +184,7 @@ export class ShopsService {
 
     // Invalidate caches
     await cacheDel(`${CACHE_PREFIX}:${id}`)
-    await cacheDeletePattern('bakaloo:vendors:active:*')
+    await cacheDeletePattern('lndry:vendors:active:*')
 
     // Task 13.3: Trigger allocation recompute when serviceable_pincodes
     // or delivery_radius_km changes (Requirements 4.8, 4.9).
@@ -260,7 +260,7 @@ export class ShopsService {
 
     // Invalidate caches
     await cacheDel(`${CACHE_PREFIX}:${id}`)
-    await cacheDeletePattern('bakaloo:vendors:active:*')
+    await cacheDeletePattern('lndry:vendors:active:*')
 
     logger.info({ userId, shopId: id, action: 'shop_deleted' }, 'Shop soft-deleted')
 

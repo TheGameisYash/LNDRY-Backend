@@ -2,7 +2,7 @@
  * Report caching utility.
  *
  * Provides cache-through helpers for report endpoints with:
- * - Key pattern: bakaloo:reports:{endpoint}:{hash_of_query}:{shopId|global}
+ * - Key pattern: lndry:reports:{endpoint}:{hash_of_query}:{shopId|global}
  * - TTL: 300 seconds
  * - X-Report-Generated-At header on cached responses
  *
@@ -36,7 +36,7 @@ function hashQuery(query) {
 export function buildReportCacheKey(endpoint, query, shopId) {
   const qHash = hashQuery(query)
   const scope = shopId || 'global'
-  return `bakaloo:reports:${endpoint}:${qHash}:${scope}`
+  return `lndry:reports:${endpoint}:${qHash}:${scope}`
 }
 
 /**

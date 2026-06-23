@@ -179,9 +179,9 @@ describe('ShopProductsService.authorizeMutation', () => {
 })
 
 describe('ShopProductsService cache key shape (Requirement 14.3)', () => {
-  it('builds the canonical bakaloo:shop-garment_rates:v1:{shop}:p{page} key', () => {
+  it('builds the canonical lndry:shop-garment_rates:v1:{shop}:p{page} key', () => {
     const svc = new ShopProductsService(new ShopProductsRepository())
     const key = svc.cacheKeyForList('shop-uuid', { page: 2, limit: 50 })
-    expect(key).toBe('bakaloo:shop-garment_rates:v1:shop-uuid:p2:l50')
+    expect(key).toBe('lndry:shop-garment_rates:v1:shop-uuid:p2:l50')
   })
 })

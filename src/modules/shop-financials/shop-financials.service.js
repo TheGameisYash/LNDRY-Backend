@@ -15,14 +15,14 @@ import { cacheGet, cacheSet, cacheDeletePattern } from '../../utils/cache.js'
  *   same decision.
  *
  * Caching (design.md Caching Strategy):
- *   Key shape — bakaloo:financials:v1:{vendor_id}:{period_type}:{from}:{to}:p{page}
+ *   Key shape — lndry:financials:v1:{vendor_id}:{period_type}:{from}:{to}:p{page}
  *   TTL       — 900 seconds (15 minutes)
  *   Invalidation — `invalidateForShop(shopId)` is called by the
  *     Settlement_Worker after writing rows for that shop, so reads see
  *     fresh aggregates within one settlement run.
  */
 
-const CACHE_PREFIX = 'bakaloo:financials:v1'
+const CACHE_PREFIX = 'lndry:financials:v1'
 const CACHE_TTL_SECONDS = 900
 
 const STAFF_ROLES_ALLOWED_TO_READ = new Set(['SHOP_ADMIN', 'SHOP_MANAGER'])

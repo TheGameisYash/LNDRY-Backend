@@ -32,13 +32,8 @@ export class OrderOtpService {
       [orderId, otpHash, purpose, expiresAt]
     )
 
-    // 2. Sync plaintext OTP to the orders table so it can be displayed to the customer
-    const orderColumn = purpose === 'PICKUP' ? 'pickup_otp' : 'delivery_otp'
-    await query(
-      `UPDATE orders SET ${orderColumn} = $1, updated_at = NOW() WHERE id = $2`,
-      [rawOtp, orderId]
-    )
-
+    // Plaintext OTP is NOT synced to the orders table to prevent insecure storage.
+    // It is returned so it can be sent to the customer via SMS/notification at generation time.
     return rawOtp
   }
 

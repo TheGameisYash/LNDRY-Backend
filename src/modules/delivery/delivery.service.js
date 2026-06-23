@@ -1,3 +1,7 @@
+// PHASE 1 SCOPE: No live tracking for customers. 
+// Rider uses external Google Maps for navigation.
+// Customer sees status timeline only (not GPS coordinates).
+
 import crypto from 'node:crypto'
 import { logger } from '../../config/logger.js'
 import { orderQueue } from '../../config/bullmq.js'
@@ -594,7 +598,7 @@ export class DeliveryService {
   async getStoreInfo(shopId) {
     const shop = await this.repository.getShopInfo(shopId)
     return {
-      name: shop?.name || 'Bakaloo Store',
+      name: shop?.name || 'LNDRY Store',
       address: shop?.address || '',
       phone: shop?.phone || '',
       lat: Number(shop?.pickup_lat) || 0,
@@ -605,18 +609,8 @@ export class DeliveryService {
   async updateLocation(riderId, latitude, longitude) {
     await this.repository.updateLocation(riderId, latitude, longitude)
 
-    // Broadcast to admin dashboard and customers tracking this rider
-    if (this.fastify?.emitOrderUpdate) {
-      const orders = await this.repository.getAssignedOrders(riderId, 'IN_TRANSIT')
-      for (const order of orders) {
-        this.fastify.emitOrderUpdate(order.order_id, {
-          type: 'RIDER_LOCATION',
-          lat: latitude,
-          lng: longitude,
-          riderId,
-        })
-      }
-    }
+    // PHASE 1 SCOPE: No live tracking for customers.
+    // Real-time GPS coordinate streaming is disabled.
   }
 
   async getDeliveryHistory(riderId, page = 1, limit = 20) {
@@ -832,7 +826,7 @@ export class DeliveryService {
         lng: customerLng,
       },
       storeAddress: {
-        name: store?.name || 'Bakaloo Store',
+        name: store?.name || 'LNDRY Store',
         address: store?.address || 'Assigned pickup hub',
         landmark: '',
         phone: store?.phone || '',

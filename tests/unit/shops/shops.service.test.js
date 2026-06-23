@@ -112,7 +112,7 @@ describe('ShopsService.create()', () => {
         created_by: USER_ID,
       })
     )
-    expect(cacheDeletePattern).toHaveBeenCalledWith('bakaloo:vendors:active:*')
+    expect(cacheDeletePattern).toHaveBeenCalledWith('lndry:vendors:active:*')
     expect(result).toEqual(MOCK_SHOP)
   })
 
@@ -176,7 +176,7 @@ describe('ShopsService.getById()', () => {
 
     const result = await service.getById(SHOP_ID)
 
-    expect(cacheGet).toHaveBeenCalledWith(`bakaloo:vendors:v1:${SHOP_ID}`)
+    expect(cacheGet).toHaveBeenCalledWith(`lndry:vendors:v1:${SHOP_ID}`)
     expect(repo.findById).not.toHaveBeenCalled()
     expect(result).toEqual(MOCK_SHOP)
   })
@@ -189,7 +189,7 @@ describe('ShopsService.getById()', () => {
 
     expect(repo.findById).toHaveBeenCalledWith(SHOP_ID)
     expect(cacheSet).toHaveBeenCalledWith(
-      `bakaloo:vendors:v1:${SHOP_ID}`,
+      `lndry:vendors:v1:${SHOP_ID}`,
       MOCK_SHOP,
       300 // TTL per Requirement 1.7
     )
@@ -331,8 +331,8 @@ describe('ShopsService.update()', () => {
 
     await service.update(SHOP_ID, { phone: '9999999999' }, USER_ID)
 
-    expect(cacheDel).toHaveBeenCalledWith(`bakaloo:vendors:v1:${SHOP_ID}`)
-    expect(cacheDeletePattern).toHaveBeenCalledWith('bakaloo:vendors:active:*')
+    expect(cacheDel).toHaveBeenCalledWith(`lndry:vendors:v1:${SHOP_ID}`)
+    expect(cacheDeletePattern).toHaveBeenCalledWith('lndry:vendors:active:*')
   })
 
   it('returns SHOP_NOT_FOUND if repo.update returns null (race with delete)', async () => {
@@ -366,8 +366,8 @@ describe('ShopsService.delete()', () => {
     const result = await service.delete(SHOP_ID, USER_ID)
 
     expect(repo.softDelete).toHaveBeenCalledWith(SHOP_ID)
-    expect(cacheDel).toHaveBeenCalledWith(`bakaloo:vendors:v1:${SHOP_ID}`)
-    expect(cacheDeletePattern).toHaveBeenCalledWith('bakaloo:vendors:active:*')
+    expect(cacheDel).toHaveBeenCalledWith(`lndry:vendors:v1:${SHOP_ID}`)
+    expect(cacheDeletePattern).toHaveBeenCalledWith('lndry:vendors:active:*')
     expect(logger.info).toHaveBeenCalledWith(
       { userId: USER_ID, shopId: SHOP_ID, action: 'shop_deleted' },
       'Shop soft-deleted'

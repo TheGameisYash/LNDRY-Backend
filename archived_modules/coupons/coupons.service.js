@@ -553,7 +553,7 @@ export class CouponsService {
       maxDiscount: coupon.maxDiscount || null,
       code: coupon.code,
       // Only return couponId if it looks like a real UUID — demo coupons
-      // have string IDs like 'demo-coupon-bakaloo50' that would crash
+      // have string IDs like 'demo-coupon-lndry50' that would crash
       // the coupon_usages INSERT (UUID type column).
       couponId: _isValidUUID(coupon.id) ? coupon.id : null,
       isDemo: !!coupon.isDemo,
@@ -586,7 +586,7 @@ export class CouponsService {
   async recordUsage(couponCode, userId, orderId) {
     const coupon = await this.repo.findByCode(couponCode)
     // Only record usage for real DB coupons with valid UUID ids.
-    // Demo coupons have string IDs (e.g. 'demo-coupon-bakaloo50') that
+    // Demo coupons have string IDs (e.g. 'demo-coupon-lndry50') that
     // would cause a PostgreSQL UUID cast error on the coupon_usages INSERT.
     if (coupon && _isValidUUID(coupon.id)) {
       await this.repo.recordUsage(coupon.id, userId, orderId)

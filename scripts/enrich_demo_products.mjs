@@ -55,27 +55,27 @@ const BRAND_LOGOS = {
 
 const VENDORS = {
   fresh: {
-    name: 'Bakaloo Fresh Sourcing',
+    name: 'LNDRY Fresh Sourcing',
     address: 'APMC Market Yard, Whitefield Link Road, Bengaluru, Karnataka 560066',
     fssai: '11223888000121',
   },
   coldChain: {
-    name: 'Bakaloo Cold Chain Foods',
+    name: 'LNDRY Cold Chain Foods',
     address: 'Warehouse 7, KIADB Food Park, Devanahalli, Karnataka 562110',
     fssai: '11223999000451',
   },
   retail: {
-    name: 'Bakaloo Retail Supplies',
+    name: 'LNDRY Retail Supplies',
     address: 'Plot 14, Industrial Estate Phase 2, Bengaluru, Karnataka 560048',
     fssai: '11223111000987',
   },
   essentials: {
-    name: 'Bakaloo Essentials Distribution',
+    name: 'LNDRY Essentials Distribution',
     address: 'Unit 3, Logistics Park, Hoskote Road, Bengaluru, Karnataka 560067',
     fssai: null,
   },
   essentialsFood: {
-    name: 'Bakaloo Essentials Distribution',
+    name: 'LNDRY Essentials Distribution',
     address: 'Unit 3, Logistics Park, Hoskote Road, Bengaluru, Karnataka 560067',
     fssai: '11223111000987',
   },
@@ -247,7 +247,7 @@ function buildTags(config) {
 }
 
 function buildMetaTitle(name, brand) {
-  return `${name} | ${brand} | Bakaloo`
+  return `${name} | ${brand} | LNDRY`
 }
 
 function buildMetaDescription(config) {
@@ -258,12 +258,12 @@ function buildAddress(index, customer) {
   return {
     name: customer.name,
     phone: customer.phone,
-    line1: `${12 + index}, Bakaloo Residency`,
+    line1: `${12 + index}, LNDRY Residency`,
     line2: 'Brookefield Main Road',
     city: 'Bengaluru',
     state: 'Karnataka',
     pincode: String(560030 + index).padStart(6, '0'),
-    landmark: 'Near Bakaloo Hub',
+    landmark: 'Near LNDRY Hub',
   }
 }
 
@@ -437,7 +437,7 @@ const PRODUCT_CONFIGS = {
     maxOrderQty: 8,
   }),
   'Apple — Shimla': freshProduct({
-    brand: 'Bakaloo Fresh',
+    brand: 'LNDRY Fresh',
     netQuantity: '1 kg',
     productType: 'Shimla apple',
     variantLabel: 'Source',
@@ -464,7 +464,7 @@ const PRODUCT_CONFIGS = {
     orderQty: 1,
   }),
   'Banana — Robusta': freshProduct({
-    brand: 'Bakaloo Fresh',
+    brand: 'LNDRY Fresh',
     netQuantity: '1 kg',
     productType: 'Robusta banana',
     variantLabel: 'Ripeness',
@@ -639,7 +639,7 @@ const PRODUCT_CONFIGS = {
   'Farm Eggs — 6 Pack': foodProduct({
     family: 'dairy',
     vendorKey: 'coldChain',
-    brand: 'Bakaloo Farm Fresh',
+    brand: 'LNDRY Farm Fresh',
     netQuantity: '6 eggs',
     productType: 'Farm eggs',
     variantLabel: 'Pack Count',
@@ -952,7 +952,7 @@ const PRODUCT_CONFIGS = {
     reviewLead: 'Strong aroma and easy to make for a quick morning coffee',
   }),
   Onion: freshProduct({
-    brand: 'Bakaloo Fresh',
+    brand: 'LNDRY Fresh',
     netQuantity: '1 kg',
     productType: 'Red onion',
     variantLabel: 'Source',
@@ -1063,7 +1063,7 @@ const PRODUCT_CONFIGS = {
     maxOrderQty: 8,
   }),
   Potato: freshProduct({
-    brand: 'Bakaloo Fresh',
+    brand: 'LNDRY Fresh',
     netQuantity: '1 kg',
     productType: 'Table potato',
     variantLabel: 'Usage',
@@ -1120,7 +1120,7 @@ const PRODUCT_CONFIGS = {
   }),
   'Red Chilli Powder — 200g': foodProduct({
     family: 'spices',
-    brand: 'Bakaloo Select',
+    brand: 'LNDRY Select',
     netQuantity: '200 g',
     productType: 'Red chilli powder',
     variantLabel: 'Heat Level',
@@ -1148,7 +1148,7 @@ const PRODUCT_CONFIGS = {
     reviewLead: 'Good colour and the spice level works well for regular cooking',
   }),
   'Spinach (Palak)': freshProduct({
-    brand: 'Bakaloo Fresh',
+    brand: 'LNDRY Fresh',
     netQuantity: '250 g',
     productType: 'Leafy spinach',
     variantLabel: 'Cut Type',
@@ -1226,7 +1226,7 @@ const PRODUCT_CONFIGS = {
     reviewLead: 'Nice aroma and gives a strong cup with milk',
   }),
   'Tomato — Local': freshProduct({
-    brand: 'Bakaloo Fresh',
+    brand: 'LNDRY Fresh',
     netQuantity: '1 kg',
     productType: 'Local tomato',
     variantLabel: 'Use',
@@ -1463,7 +1463,7 @@ Object.assign(PRODUCT_CONFIGS, {
 PRODUCT_CONFIGS['Banan a — Robusta']
 
 PRODUCT_CONFIGS['Banana — Robusta'] = freshProduct({
-  brand: 'Bakaloo Fresh',
+  brand: 'LNDRY Fresh',
   netQuantity: '1 kg',
   productType: 'Robusta banana',
   variantLabel: 'Ripeness',

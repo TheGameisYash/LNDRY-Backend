@@ -37,10 +37,10 @@ export default async function shopTransactionRoutes(fastify) {
     const role = request.user?.role
     const shopRole = request.user?.shopRole || request.user?.shop_role
     if (role === 'ADMIN') return
-    if (shopRole === 'SHOP_ADMIN' || shopRole === 'SHOP_MANAGER') return
+    if (shopRole === 'VENDOR_OWNER' || shopRole === 'VENDOR_STAFF') return
     return reply.code(403).send({
       success: false,
-      message: 'Forbidden — Shop Admin, Shop Manager, or Super Admin access required',
+      message: 'Forbidden — Vendor Owner, Vendor Staff, or Super Admin access required',
       code: 'FORBIDDEN',
     })
   }

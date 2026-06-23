@@ -5,7 +5,7 @@ import { logger } from './config/logger.js'
 import { startWorkerRuntime, closeWorkerRuntime } from './runtime/workers.js'
 
 const WORKER_HEARTBEAT_FILE =
-  process.env.WORKER_HEARTBEAT_FILE || '/tmp/bakaloo-worker-heartbeat'
+  process.env.WORKER_HEARTBEAT_FILE || '/tmp/lndry-worker-heartbeat'
 const WORKER_HEARTBEAT_INTERVAL_MS = 30000
 
 const start = async () => {

@@ -72,7 +72,7 @@ const validBank = {
   bank_account_number: '1234567890',
   bank_ifsc: 'HDFC0001234',
   bank_name: 'HDFC',
-  bank_holder_name: 'Bakaloo Mart',
+  bank_holder_name: 'LNDRY Mart',
 }
 
 const lockedRow = (overrides = {}) => ({

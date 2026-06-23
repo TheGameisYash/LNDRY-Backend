@@ -16,7 +16,7 @@ import 'dotenv/config'
 import pg from 'pg'
 import bcrypt from 'bcrypt'
 
-const EMAIL = process.env.LOCAL_ADMIN_EMAIL || 'admin@bakaloo.com'
+const EMAIL = process.env.LOCAL_ADMIN_EMAIL || 'admin@lndry.com'
 const PASSWORD = process.env.LOCAL_ADMIN_PASSWORD || 'Admin@123'
 const NAME = 'Local Super Admin'
 const PHONE = '9000000000'

@@ -105,7 +105,7 @@ describe('VendorEmployeesService.resetPassword', () => {
       id: STAFF_ID,
       user_id: TARGET_USER_ID,
       vendor_id: SHOP_ID,
-      role: 'VENDOR_EMPLOYEE',
+      role: 'VENDOR_STAFF',
       is_active: true,
     })
     const service = new VendorEmployeesService(repo)
@@ -237,7 +237,7 @@ describe('VendorEmployeesService.deactivate', () => {
       id: STAFF_ID,
       user_id: TARGET_USER_ID,
       vendor_id: SHOP_ID,
-      role: 'VENDOR_EMPLOYEE',
+      role: 'VENDOR_STAFF',
       is_active: true,
     })
     repo.softDelete.mockResolvedValueOnce(true)

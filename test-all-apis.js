@@ -43,7 +43,7 @@ async function test(method, path, body = null, expect = 200) {
 
 async function main() {
   // 1. LOGIN
-  const login = await httpReq('POST', '/admin/auth/login', { email: 'admin@bakaloo.com', password: 'Admin@123' });
+  const login = await httpReq('POST', '/admin/auth/login', { email: 'admin@lndry.com', password: 'Admin@123' });
   if (login.status !== 200 || !login.data?.data?.accessToken) {
     console.log('Login failed:', login.status, JSON.stringify(login.data));
     return;

@@ -26,9 +26,9 @@
 //     - no row ever changes byte-for-byte after insertion.
 //
 // References:
-//   - bakaloo-backend/src/modules/shop-transactions/shop-transactions.repository.js
-//   - bakaloo-backend/src/modules/shop-transactions/shop-transactions.routes.js
-//   - bakaloo-backend/tests/unit/shop-transactions/shop-transactions.smoke.test.js
+//   - lndry-backend/src/modules/shop-transactions/shop-transactions.repository.js
+//   - lndry-backend/src/modules/shop-transactions/shop-transactions.routes.js
+//   - lndry-backend/tests/unit/shop-transactions/shop-transactions.smoke.test.js
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as fc from 'fast-check'

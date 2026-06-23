@@ -59,9 +59,9 @@ const settings = [
     ['currency_symbol', '"\\u20b9"', 'Currency display symbol'],
 
     // Email Templates
-    ['email_from_address', '"noreply@bakaloo.com"', 'Outgoing email address'],
-    ['email_from_name', '"Bakaloo"', 'Outgoing email display name'],
-    ['email_welcome_subject', '"Welcome to Bakaloo!"', 'Welcome email subject'],
+    ['email_from_address', '"noreply@lndry.com"', 'Outgoing email address'],
+    ['email_from_name', '"LNDRY"', 'Outgoing email display name'],
+    ['email_welcome_subject', '"Welcome to LNDRY!"', 'Welcome email subject'],
     ['email_order_confirm_subject', '"Your order has been confirmed"', 'Order confirmation subject'],
     ['email_delivery_subject', '"Your order is on the way!"', 'Delivery update subject'],
     ['email_smtp_host', '""', 'SMTP host'],

@@ -17,10 +17,10 @@ function normalizeTextColor(value) {
 }
 
 async function invalidateTabCaches() {
-  await cacheDeletePattern('bakaloo:tab_manifest:*')
-  await cacheDeletePattern('bakaloo:tab_home:*')
-  await cacheDeletePattern('bakaloo:admin_theme_tabs:*')
-  await cacheDeletePattern('bakaloo:tab_themes')
+  await cacheDeletePattern('lndry:tab_manifest:*')
+  await cacheDeletePattern('lndry:tab_home:*')
+  await cacheDeletePattern('lndry:admin_theme_tabs:*')
+  await cacheDeletePattern('lndry:tab_themes')
 }
 
 function compareTabsBySortOrder(a, b) {

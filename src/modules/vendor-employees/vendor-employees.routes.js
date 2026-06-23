@@ -29,7 +29,7 @@ export default async function vendorEmployeesRoutes(fastify) {
     const role = request.user?.role
     const shopRole = request.user?.shopRole || request.user?.shop_role
     if (role === 'ADMIN') return
-    if (shopRole === 'VENDOR_OWNER' || shopRole === 'SHOP_ADMIN') return
+    if (shopRole === 'VENDOR_OWNER') return
     return reply.code(403).send({
       success: false,
       message: 'Forbidden — Vendor Owner or Super Admin access required',
@@ -44,7 +44,7 @@ export default async function vendorEmployeesRoutes(fastify) {
     const role = request.user?.role
     const shopRole = request.user?.shopRole || request.user?.shop_role
     if (role === 'ADMIN') return
-    if (shopRole === 'VENDOR_OWNER' || shopRole === 'VENDOR_STAFF' || shopRole === 'SHOP_ADMIN' || shopRole === 'SHOP_MANAGER') return
+    if (shopRole === 'VENDOR_OWNER' || shopRole === 'VENDOR_STAFF') return
     return reply.code(403).send({
       success: false,
       message: 'Forbidden — Vendor Owner/Staff or Super Admin access required',
@@ -83,7 +83,7 @@ export default async function vendorEmployeesRoutes(fastify) {
         properties: {
           page: { type: 'integer', minimum: 1, default: 1 },
           limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
-          role: { type: 'string', enum: ['SHOP_ADMIN', 'SHOP_MANAGER', 'SHOP_STAFF', 'SHOP_VIEWER'] },
+          role: { type: 'string', enum: ['VENDOR_OWNER', 'VENDOR_STAFF'] },
           is_active: { type: 'string', enum: ['true', 'false'] },
           include_deleted: { type: 'string', enum: ['true', 'false'] },
         },

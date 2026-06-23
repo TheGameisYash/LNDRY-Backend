@@ -6,7 +6,7 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-ADMIN_USER="${ADMIN_USER:-bakalooops}"
+ADMIN_USER="${ADMIN_USER:-lndryops}"
 SOURCE_USER="${SOURCE_USER:-ubuntu}"
 TRUSTED_SSH_CIDR="${TRUSTED_SSH_CIDR:-}"
 
@@ -41,12 +41,12 @@ if [ -f "/home/${SOURCE_USER}/.ssh/authorized_keys" ]; then
     "/home/${ADMIN_USER}/.ssh/authorized_keys"
 fi
 
-install -d -m 750 -o "${ADMIN_USER}" -g "${ADMIN_USER}" /opt/bakaloo/app
-install -d -m 700 -o "${ADMIN_USER}" -g "${ADMIN_USER}" /srv/bakaloo/postgres
-install -d -m 700 -o "${ADMIN_USER}" -g "${ADMIN_USER}" /srv/bakaloo/redis
-install -d -m 700 -o "${ADMIN_USER}" -g "${ADMIN_USER}" /srv/bakaloo/backups
+install -d -m 750 -o "${ADMIN_USER}" -g "${ADMIN_USER}" /opt/lndry/app
+install -d -m 700 -o "${ADMIN_USER}" -g "${ADMIN_USER}" /srv/lndry/postgres
+install -d -m 700 -o "${ADMIN_USER}" -g "${ADMIN_USER}" /srv/lndry/redis
+install -d -m 700 -o "${ADMIN_USER}" -g "${ADMIN_USER}" /srv/lndry/backups
 
-cat >/etc/ssh/sshd_config.d/60-bakaloo-hardening.conf <<'EOF'
+cat >/etc/ssh/sshd_config.d/60-lndry-hardening.conf <<'EOF'
 PasswordAuthentication no
 PermitRootLogin no
 PubkeyAuthentication yes

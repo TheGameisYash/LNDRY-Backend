@@ -9,7 +9,7 @@
 -- Without this backfill, "Create shop" and every other shop-scoped CTA
 -- stays hidden because useRouteRBAC.canWrite derives from the new tokens.
 --
--- The token list mirrors bakaloo-dashboard/src/lib/permissions.ts
+-- The token list mirrors lndry-dashboard/src/lib/permissions.ts
 -- PermissionToken union (one source of truth).
 --
 -- Idempotent — re-running only adds tokens that are not already present

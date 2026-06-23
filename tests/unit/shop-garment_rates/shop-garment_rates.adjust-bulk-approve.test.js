@@ -187,7 +187,7 @@ describe('ShopProductsService.adjustStock', () => {
 
     // Cache invalidation runs AFTER COMMIT
     expect(cacheDeletePattern).toHaveBeenCalledWith(
-      expect.stringContaining(`bakaloo:shop-garment_rates:v1:${SHOP_ID}:`)
+      expect.stringContaining(`lndry:shop-garment_rates:v1:${SHOP_ID}:`)
     )
   })
 

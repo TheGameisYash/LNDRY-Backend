@@ -785,7 +785,7 @@ describe('Req 11.2 — Redis cache invalidated on stock-out and restock', () => 
     )
 
     expect(cacheDeletePattern).toHaveBeenCalledWith(
-      `bakaloo:shop-garment_rates:v1:${SHOP_ID}:*`
+      `lndry:shop-garment_rates:v1:${SHOP_ID}:*`
     )
   })
 
@@ -827,7 +827,7 @@ describe('Req 11.2 — Redis cache invalidated on stock-out and restock', () => 
     )
 
     expect(cacheDeletePattern).toHaveBeenCalledWith(
-      `bakaloo:shop-garment_rates:v1:${SHOP_ID}:*`
+      `lndry:shop-garment_rates:v1:${SHOP_ID}:*`
     )
   })
 

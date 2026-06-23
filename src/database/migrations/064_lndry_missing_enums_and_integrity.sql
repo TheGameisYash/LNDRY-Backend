@@ -7,30 +7,47 @@
 -- These statuses are used by the state machine but were not explicitly added
 -- in migrations 057/058. ADD VALUE IF NOT EXISTS is safe for re-runs.
 
-DO $$ BEGIN
+DO $$
+BEGIN
   ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'PACKED';
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
-DO $$ BEGIN
+DO $$
+BEGIN
   ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'OUT_FOR_DELIVERY';
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
-DO $$ BEGIN
+DO $$
+BEGIN
   ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'DELIVERED';
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
-DO $$ BEGIN
+DO $$
+BEGIN
   ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'REFUNDED';
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
-DO $$ BEGIN
+DO $$
+BEGIN
   ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'CANCELLED';
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
--- Also ensure PROCESSING is present (used in state machine)
-DO $$ BEGIN
+DO $$
+BEGIN
   ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'PROCESSING';
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 2. HARDEN otp_challenges TABLE ──────────────────────────────────────────
 -- Add purpose and used_at columns for single-use + purpose-bound enforcement.
@@ -47,11 +64,39 @@ ALTER TABLE order_otps ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ;
 -- Sync consumed_at → used_at for existing records
 UPDATE order_otps SET used_at = consumed_at WHERE used_at IS NULL AND consumed_at IS NOT NULL;
 
--- ─── 4. ADD RIDER role to user_role enum if missing ──────────────────────────
+-- ─── 4. ADD CANONICAL ROLES to user_role enum and update chk_users_platform_role ───
 
-DO $$ BEGIN
+DO $$
+BEGIN
   ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'RIDER';
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'SUPER_ADMIN';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'FINANCE_ADMIN';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'VENDOR_APPLICANT';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_users_platform_role;
+ALTER TABLE users ADD CONSTRAINT chk_users_platform_role
+  CHECK (platform_role IS NULL OR platform_role IN ('SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN'));
 
 -- ─── 5. POST-MIGRATION INTEGRITY CHECK ──────────────────────────────────────
 -- Asserts that ALL required LNDRY Phase 1 tables exist. If any table is missing,

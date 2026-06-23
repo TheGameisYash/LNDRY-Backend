@@ -134,12 +134,12 @@ function allowedTargetRoles({ invitedByPlatformRole, invitedByRole }) {
   if (invitedByPlatformRole && HQ_ROLES.includes(invitedByPlatformRole)) {
     return new Set([
       'VENDOR_OWNER',
-      'VENDOR_EMPLOYEE',
+      'VENDOR_STAFF',
     ])
   }
   switch (invitedByRole) {
     case 'VENDOR_OWNER':
-      return new Set(['VENDOR_EMPLOYEE'])
+      return new Set(['VENDOR_STAFF'])
     default:
       return null
   }

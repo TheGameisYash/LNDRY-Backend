@@ -121,9 +121,7 @@ export const CANONICAL_PERMISSIONS = PERMISSIONS
 export const HQ_ROLES = Object.freeze([
   'SUPER_ADMIN',
   'ADMIN',
-  'HQ_MANAGER',
-  'HQ_FINANCE',
-  'HQ_SUPPORT',
+  'FINANCE_ADMIN',
 ])
 
 // Internal helper — every Permission_String in the canonical vocabulary; used
@@ -177,34 +175,7 @@ const SHOP_SCOPED_PERMISSIONS = Object.freeze(
 export const HQ_ROLE_PERMISSIONS = Object.freeze({
   SUPER_ADMIN: Object.freeze(new Set(ALL_PERMISSIONS)),
   ADMIN: Object.freeze(new Set(ALL_PERMISSIONS)),
-  HQ_MANAGER: Object.freeze(
-    new Set([
-      'reports.global_view',
-      'riders.assign',
-      'riders.view',
-      'shop_coupons.create',
-      'shop_coupons.update',
-      'shop_coupons.view',
-      'shop_orders.assign_rider',
-      'shop_orders.cancel',
-      'shop_orders.export',
-      'shop_orders.update_status',
-      'shop_orders.view',
-      'vendor_services.approve',
-      'vendor_services.bulk_update',
-      'vendor_services.create',
-      'vendor_services.update',
-      'vendor_services.view',
-      'shop_reports.view',
-      'vendor_staff.create',
-      'vendor_staff.reset_password',
-      'vendor_staff.update',
-      'vendor_staff.view',
-      'vendors.update',
-      'vendors.view',
-    ]),
-  ),
-  HQ_FINANCE: Object.freeze(
+  FINANCE_ADMIN: Object.freeze(
     new Set([
       'audit_logs.view',
       'finance.global_view',
@@ -218,21 +189,6 @@ export const HQ_ROLE_PERMISSIONS = Object.freeze({
       'shop_reports.view',
       'shop_transactions.export',
       'shop_transactions.view',
-      'vendors.view',
-    ]),
-  ),
-  HQ_SUPPORT: Object.freeze(
-    new Set([
-      'riders.assign',
-      'riders.view',
-      'shop_coupons.view',
-      'shop_orders.assign_rider',
-      'shop_orders.cancel',
-      'shop_orders.update_status',
-      'shop_orders.view',
-      'vendor_services.view',
-      'shop_reports.view',
-      'vendor_staff.view',
       'vendors.view',
     ]),
   ),
@@ -264,38 +220,13 @@ export const HQ_ROLE_PERMISSIONS = Object.freeze({
  * @type {Readonly<Record<'SHOP_ADMIN' | 'SHOP_MANAGER' | 'SHOP_STAFF' | 'SHOP_VIEWER', Readonly<Set<string>>>>}
  */
 export const SHOP_ROLE_DEFAULT_PERMISSIONS = Object.freeze({
-  SHOP_ADMIN: Object.freeze(new Set(SHOP_SCOPED_PERMISSIONS)),
-  SHOP_MANAGER: Object.freeze(
+  VENDOR_OWNER: Object.freeze(new Set(SHOP_SCOPED_PERMISSIONS)),
+  VENDOR_STAFF: Object.freeze(
     new Set(
       SHOP_SCOPED_PERMISSIONS.filter(
         (p) => p !== 'vendor_staff.delete' && p !== 'shop_financials.mark_paid',
       ),
     ),
-  ),
-  SHOP_STAFF: Object.freeze(
-    new Set([
-      'shop_orders.view',
-      'shop_orders.update_status',
-      'vendor_services.view',
-      'vendor_services.update',
-    ]),
-  ),
-  SHOP_VIEWER: Object.freeze(
-    new Set([
-      'vendors.view',
-      'vendor_services.view',
-      'shop_orders.view',
-      'shop_transactions.view',
-      'shop_financials.view',
-      'shop_reports.view',
-    ]),
-  ),
-  VENDOR_OWNER: Object.freeze(new Set(SHOP_SCOPED_PERMISSIONS)),
-  VENDOR_EMPLOYEE: Object.freeze(
-    new Set([
-      'shop_orders.view',
-      'shop_orders.update_status',
-    ]),
   ),
 })
 

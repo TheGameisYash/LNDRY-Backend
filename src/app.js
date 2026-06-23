@@ -13,6 +13,19 @@ export const buildApp = async () => {
   const app = Fastify({
     logger: {
       level: env.LOG_LEVEL,
+      redact: {
+        paths: [
+          'req.body.otp',
+          'req.body.pickup_otp',
+          'req.body.delivery_otp',
+          'otp',
+          'pickup_otp',
+          'delivery_otp',
+          'otp_hash',
+          'otp_code'
+        ],
+        censor: '[REDACTED]'
+      },
       ...(env.LOG_PRETTY && {
         transport: {
           target: 'pino-pretty',
@@ -95,12 +108,17 @@ export const buildApp = async () => {
 
   // Customers — dedicated customer profile routes (LNDRY-API-001 canonical)
   await app.register(import('./modules/customers/customers.routes.js'), {
-    prefix: '/api/v1/customer/me',
+    prefix: '/api/v1/customer',
   })
-  // Backward-compatible alias — old path, will be removed after mobile app migration
-  await app.register(import('./modules/customers/customers.routes.js'), {
-    prefix: '/api/v1/customers',
-  })
+  // DEPRECATED ALIAS — remove after frontend migration
+  await app.register(async (subApp) => {
+    subApp.addHook('preHandler', async (request, reply) => {
+      reply.header('Deprecation', 'true')
+      const canonicalUrl = request.raw.url.replace('/api/v1/customers', '/api/v1/customer')
+      reply.header('Link', `<${canonicalUrl}>; rel="successor-version"`)
+    })
+    await subApp.register(import('./modules/customers/customers.routes.js'))
+  }, { prefix: '/api/v1/customers' })
 
   // Devices — FCM token registration
   await app.register(import('./modules/devices/devices.routes.js'), {
@@ -215,19 +233,29 @@ export const buildApp = async () => {
   await app.register(import('./modules/delivery/delivery.routes.js'), {
     prefix: '/api/v1/rider/assignments',
   })
-  // Backward-compatible alias — old path, will be removed after mobile app migration
-  await app.register(import('./modules/delivery/delivery.routes.js'), {
-    prefix: '/api/v1/delivery',
-  })
+  // DEPRECATED ALIAS — remove after frontend migration
+  await app.register(async (subApp) => {
+    subApp.addHook('preHandler', async (request, reply) => {
+      reply.header('Deprecation', 'true')
+      const canonicalUrl = request.raw.url.replace('/api/v1/delivery', '/api/v1/rider/assignments')
+      reply.header('Link', `<${canonicalUrl}>; rel="successor-version"`)
+    })
+    await subApp.register(import('./modules/delivery/delivery.routes.js'))
+  }, { prefix: '/api/v1/delivery' })
 
   // Vendor Orders — vendor-side order management (LNDRY-API-001 canonical)
   await app.register(import('./modules/vendor-orders/vendor-orders.routes.js'), {
     prefix: '/api/v1/vendor/orders',
   })
-  // Backward-compatible alias — old path, will be removed after mobile app migration
-  await app.register(import('./modules/vendor-orders/vendor-orders.routes.js'), {
-    prefix: '/api/v1/vendor-orders',
-  })
+  // DEPRECATED ALIAS — remove after frontend migration
+  await app.register(async (subApp) => {
+    subApp.addHook('preHandler', async (request, reply) => {
+      reply.header('Deprecation', 'true')
+      const canonicalUrl = request.raw.url.replace('/api/v1/vendor-orders', '/api/v1/vendor/orders')
+      reply.header('Link', `<${canonicalUrl}>; rel="successor-version"`)
+    })
+    await subApp.register(import('./modules/vendor-orders/vendor-orders.routes.js'))
+  }, { prefix: '/api/v1/vendor-orders' })
 
   // Pickup Slots — slot capacity holds and availability
   await app.register(import('./modules/pickup-slots/pickup-slots.routes.js'), {
@@ -284,7 +312,7 @@ export const buildApp = async () => {
   })
 
   // Alias mount at /vendors/:shopId/staff so the dashboard's canonical URL
-  // pattern (see bakaloo-dashboard/src/services/shop-staff.service.ts and
+  // pattern (see lndry-dashboard/src/services/shop-staff.service.ts and
   // design.md §6 "Shop_Staff_UI") resolves without a separate URL rewrite
   // layer. The controller's resolveShopId() prefers `request.params.shopId`
   // when present, so all role-check + scope semantics stay identical to the

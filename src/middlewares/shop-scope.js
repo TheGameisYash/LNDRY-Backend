@@ -45,7 +45,7 @@ import { emit as emitAudit } from '../utils/audit-log.js'
  *   `ERROR_CODES.SHOP_SCOPE_MISMATCH` are unaffected.
  */
 
-const STAFF_ACTIVE_CACHE_PREFIX = 'bakaloo:staff-active:v1:'
+const STAFF_ACTIVE_CACHE_PREFIX = 'lndry:staff-active:v1:'
 const STAFF_ACTIVE_TTL_SECONDS = 300
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

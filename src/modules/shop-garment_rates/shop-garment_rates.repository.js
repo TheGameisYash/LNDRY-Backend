@@ -560,7 +560,7 @@ export class ShopProductsRepository {
    *   - Populates `orderId` for `ORDER_DEDUCTION`, `CANCELLATION_RESTORE`,
    *     and `RETURN_STOCK` so the order-detail "stock impact" view can
    *     join via `idx_stock_movements_order` (design §3.2.4).
-   *   - Cache invalidation (`bakaloo:shop-garment_rates:*` SCAN) runs from the
+   *   - Cache invalidation (`lndry:shop-garment_rates:*` SCAN) runs from the
    *     service layer **after** COMMIT (R23.13).
    *
    * Validation:

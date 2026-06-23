@@ -6,7 +6,7 @@ APP_ENV_PATH="${APP_ENV_PATH:-deploy/production/app.env}"
 INFRA_ENV_PATH="${INFRA_ENV_PATH:-deploy/production/infra.env}"
 
 if [ -z "${SSM_PARAMETER_PREFIX}" ]; then
-  echo "Usage: SSM_PARAMETER_PREFIX=/bakaloo/backend/prod ./deploy/production/load-ssm-env.sh"
+  echo "Usage: SSM_PARAMETER_PREFIX=/lndry/backend/prod ./deploy/production/load-ssm-env.sh"
   exit 1
 fi
 
@@ -57,15 +57,15 @@ declare -A infra_only_keys=(
 } > "${APP_ENV_PATH}"
 
 {
-  printf 'COMPOSE_PROJECT_NAME=%s\n' "${params[COMPOSE_PROJECT_NAME]:-bakaloo}"
+  printf 'COMPOSE_PROJECT_NAME=%s\n' "${params[COMPOSE_PROJECT_NAME]:-lndry}"
   printf 'TZ=%s\n' "${params[TZ]:-Asia/Kolkata}"
-  printf 'POSTGRES_DB=%s\n' "${params[POSTGRES_DB]:-${params[DB_NAME]:-grocery_db}}"
-  printf 'POSTGRES_USER=%s\n' "${params[POSTGRES_USER]:-${params[DB_USER]:-grocery_user}}"
+  printf 'POSTGRES_DB=%s\n' "${params[POSTGRES_DB]:-${params[DB_NAME]:-lndry_db}}"
+  printf 'POSTGRES_USER=%s\n' "${params[POSTGRES_USER]:-${params[DB_USER]:-lndry_user}}"
   printf 'POSTGRES_PASSWORD=%s\n' "${params[POSTGRES_PASSWORD]:-${params[DB_PASSWORD]:-}}"
   printf 'REDIS_PASSWORD=%s\n' "${params[REDIS_PASSWORD]:-}"
-  printf 'POSTGRES_DATA_DIR=%s\n' "${params[POSTGRES_DATA_DIR]:-/srv/bakaloo/postgres}"
-  printf 'REDIS_DATA_DIR=%s\n' "${params[REDIS_DATA_DIR]:-/srv/bakaloo/redis}"
-  printf 'BACKUP_DIR=%s\n' "${params[BACKUP_DIR]:-/srv/bakaloo/backups}"
+  printf 'POSTGRES_DATA_DIR=%s\n' "${params[POSTGRES_DATA_DIR]:-/srv/lndry/postgres}"
+  printf 'REDIS_DATA_DIR=%s\n' "${params[REDIS_DATA_DIR]:-/srv/lndry/redis}"
+  printf 'BACKUP_DIR=%s\n' "${params[BACKUP_DIR]:-/srv/lndry/backups}"
   printf 'AWS_REGION=%s\n' "${params[AWS_REGION]:-ap-south-1}"
   printf 'BACKUP_S3_BUCKET=%s\n' "${params[BACKUP_S3_BUCKET]:-}"
   printf 'BACKUP_S3_PREFIX=%s\n' "${params[BACKUP_S3_PREFIX]:-postgres}"

@@ -35,7 +35,7 @@ import { ShopProductsRepository } from './shop-garment_rates.repository.js'
  * Design:       §8.2
  */
 
-const CACHE_PREFIX = 'bakaloo:shop-garment_rates:v1'
+const CACHE_PREFIX = 'lndry:shop-garment_rates:v1'
 
 /**
  * Generate a URL-safe slug from a product name.
