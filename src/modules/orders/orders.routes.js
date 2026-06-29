@@ -87,6 +87,25 @@ export default async function ordersRoutes(fastify) {
     preHandler: [fastify.authenticate],
   }, controller.getInvoice.bind(controller))
 
+  // GET /:id/otp — Retrieve active OTP for customer
+  fastify.get('/:id/otp', {
+    schema: {
+      tags: ['Orders'],
+      summary: 'Get active OTP for customer order',
+      params: {
+        type: 'object',
+        required: ['id'],
+        properties: { id: { type: 'string', format: 'uuid' } },
+      },
+      querystring: {
+        type: 'object',
+        required: ['purpose'],
+        properties: { purpose: { type: 'string', enum: ['PICKUP', 'DELIVERY'] } },
+      },
+    },
+    preHandler: [fastify.authenticate],
+  }, controller.getOtp.bind(controller))
+
   // ─── Admin routes ───────────────────────────────────────
 
   // GET /admin/all — List all orders [ADMIN]

@@ -38,8 +38,9 @@ export default async function deliveryRoutes(fastify) {
   const service = new DeliveryService(repository, fastify)
   const controller = new DeliveryController(service)
 
-  // All routes require authentication
+  // All routes require authentication and RIDER role
   fastify.addHook('preHandler', fastify.authenticate)
+  fastify.addHook('preHandler', fastify.authorize(['RIDER']))
 
   // GET /profile — Rider profile
   fastify.get('/profile', {
@@ -66,33 +67,33 @@ export default async function deliveryRoutes(fastify) {
     schema: toggleOnlineSchema,
   }, controller.toggleOnline.bind(controller))
 
-  // GET /orders — Get assigned orders
-  fastify.get('/orders', {
+  // GET /assignments — Get assigned orders (LNDRY-API-001 list assignments)
+  fastify.get('/assignments', {
     schema: getAssignedOrdersSchema,
   }, controller.getAssignedOrders.bind(controller))
 
-  // PATCH /orders/:id/accept — Accept order
-  fastify.patch('/orders/:id/accept', {
+  // PATCH /assignments/:id/accept — Accept order assignment
+  fastify.patch('/assignments/:id/accept', {
     schema: acceptOrderSchema,
   }, controller.acceptOrder.bind(controller))
 
-  // PATCH /orders/:id/reject — Reject order
-  fastify.patch('/orders/:id/reject', {
+  // PATCH /assignments/:id/reject — Reject order assignment
+  fastify.patch('/assignments/:id/reject', {
     schema: rejectOrderSchema,
   }, controller.rejectOrder.bind(controller))
 
-  // PATCH /orders/:id/pickup — Mark picked up
-  fastify.patch('/orders/:id/pickup', {
+  // PATCH /assignments/:id/pickup — Mark picked up
+  fastify.patch('/assignments/:id/pickup', {
     schema: markPickedUpSchema,
   }, controller.markPickedUp.bind(controller))
 
-  // PATCH /orders/:id/deliver — Mark delivered
-  fastify.patch('/orders/:id/deliver', {
+  // PATCH /assignments/:id/deliver — Mark delivered
+  fastify.patch('/assignments/:id/deliver', {
     schema: markDeliveredSchema,
   }, controller.markDelivered.bind(controller))
 
-  // POST /orders/:id/proof — Upload delivery proof photo
-  fastify.post('/orders/:id/proof', {
+  // POST /assignments/:id/proof — Upload delivery proof photo
+  fastify.post('/assignments/:id/proof', {
     schema: uploadProofSchema,
   }, controller.uploadProof.bind(controller))
 
@@ -112,19 +113,8 @@ export default async function deliveryRoutes(fastify) {
   }, controller.getPayouts.bind(controller))
 
   // PATCH /location — Update location
-  // RIDER-ONLY: This route must NOT be accessible by customers.
-  // Phase 1 excludes customer live-map tracking.
   fastify.patch('/location', {
     schema: updateLocationSchema,
-    preHandler: [async function requireRiderRole(request, reply) {
-      if (request.user?.role !== 'RIDER') {
-        return reply.code(403).send({
-          success: false,
-          message: 'Forbidden — rider role required',
-          code: 'FORBIDDEN',
-        })
-      }
-    }],
   }, controller.updateLocation.bind(controller))
 
   // GET /history — Delivery history
@@ -135,13 +125,13 @@ export default async function deliveryRoutes(fastify) {
   // GET /store-info — Store location for map
   fastify.get('/store-info', controller.getStoreInfo.bind(controller))
 
-  // POST /orders/:id/verify-pickup-otp — Verify pickup OTP
-  fastify.post('/orders/:id/verify-pickup-otp', {
+  // POST /assignments/:id/verify-pickup-otp — Verify pickup OTP
+  fastify.post('/assignments/:id/verify-pickup-otp', {
     schema: verifyPickupOtpSchema,
   }, controller.verifyPickupOtp.bind(controller))
 
-  // POST /orders/:id/verify-delivery-otp — Verify delivery OTP
-  fastify.post('/orders/:id/verify-delivery-otp', {
+  // POST /assignments/:id/verify-delivery-otp — Verify delivery OTP
+  fastify.post('/assignments/:id/verify-delivery-otp', {
     schema: verifyDeliveryOtpSchema,
   }, controller.verifyDeliveryOtp.bind(controller))
 }

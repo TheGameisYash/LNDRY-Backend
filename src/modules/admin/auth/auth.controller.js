@@ -308,6 +308,28 @@ export class AdminAuthController {
   }
 
   /**
+   * `GET /api/v1/admin/auth/my-shops` (AUTH required).
+   *
+   * Returns the user's shop assignments.
+   */
+  async myShops(request, reply) {
+    const ip = request.ip
+    const userAgent = request.headers['user-agent'] || null
+
+    try {
+      const result = await this.service.myShops({
+        userId: request.user.id,
+        ip,
+        userAgent,
+      })
+
+      return reply.code(200).send(success(result, 'Shop assignments fetched'))
+    } catch (err) {
+      return mapError(request, reply, err, 'myShops')
+    }
+  }
+
+  /**
    * `POST /api/v1/admin/auth/change-password` (AUTH required).
    *
    * Body validated by `changePasswordSchema`. Verifies the caller's

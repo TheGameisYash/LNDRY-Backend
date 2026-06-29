@@ -7,8 +7,26 @@ import { runPermissionAudit } from './utils/permission-audit.js'
 import { startCampaignScheduler, stopCampaignScheduler } from './workers/campaign-scheduler.worker.js'
 import { startPaymentExpiryWorker, stopPaymentExpiryWorker } from './workers/payment-expiry.worker.js'
 
+const validateProductionConfig = () => {
+  if (env.NODE_ENV === 'production') {
+    const missing = []
+    if (!env.RAZORPAY_KEY_ID) missing.push('RAZORPAY_KEY_ID')
+    if (!env.RAZORPAY_KEY_SECRET) missing.push('RAZORPAY_KEY_SECRET')
+    if (!env.RAZORPAY_WEBHOOK_SECRET) missing.push('RAZORPAY_WEBHOOK_SECRET')
+    if (!env.GOOGLE_MAPS_API_KEY) missing.push('GOOGLE_MAPS_API_KEY')
+
+    if (missing.length > 0) {
+      logger.error(`❌ Critical production configuration keys are missing: ${missing.join(', ')}`)
+      process.exit(1)
+    }
+  }
+}
+
+// Trigger nodemon reload 2
 const start = async () => {
   try {
+    validateProductionConfig()
+
     // Test database connection before starting
     await testConnection()
 

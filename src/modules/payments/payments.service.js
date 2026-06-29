@@ -69,6 +69,9 @@ export class PaymentsService {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000)
 
     if (!razorpay) {
+      if (env.NODE_ENV === 'production' || (env.NODE_ENV !== 'test' && !env.ALLOW_MOCK_PAYMENT)) {
+        throw { statusCode: 400, message: 'Razorpay integration is not configured', code: 'RAZORPAY_CONFIG_ERROR' }
+      }
       // Mock fallback
       const mockRzpOrderId = `order_mock_${Math.random().toString(36).substring(2, 11)}`
       const payment = await this.repo.create({
@@ -188,6 +191,9 @@ export class PaymentsService {
     }
 
     const isMock = rzpOrderId.startsWith('order_mock_') || !razorpay
+    if (isMock && (env.NODE_ENV === 'production' || (env.NODE_ENV !== 'test' && !env.ALLOW_MOCK_PAYMENT))) {
+      return { success: false, message: 'Mock payment not allowed in this environment' }
+    }
 
     // HMAC-SHA256 verification
     if (!isMock) {
@@ -222,7 +228,7 @@ export class PaymentsService {
 
     if (payment.orderId) {
       // Update order payment status (legacy path)
-      await this.ordersRepo.updateStatus(payment.orderId, 'WAITING_FOR_VENDOR_CONFIRMATION', {
+      await this.ordersRepo.updateStatus(payment.orderId, 'WAITING_VENDOR_CONFIRMATION', {
         paymentStatus: 'PAID',
       })
       try {
@@ -328,25 +334,21 @@ export class PaymentsService {
               status: 'PAID',
               method: payload.payment?.entity?.method,
             })
-            await this.ordersRepo.updateStatus(payment.orderId, 'WAITING_FOR_VENDOR_CONFIRMATION', {
-              paymentStatus: 'PAID',
-            })
+            
+            // Finalize the order from draft
+            const { OrdersService } = await import('../orders/orders.service.js')
+            const { OrdersRepository } = await import('../orders/orders.repository.js')
+            const ordersService = new OrdersService(new OrdersRepository())
+            
             try {
-              await orderQueue.add(
-                'auto-reject',
-                {
-                  type: 'auto-reject',
-                  orderId: payment.orderId,
-                },
-                {
-                  jobId: `auto-reject-${payment.orderId}`,
-                  delay: 15 * 60 * 1000,
-                  removeOnComplete: true,
-                }
-              )
+              const checkRes = await ordersService.placeOrderFromDraft(payment.userId, { orderDraftId: payment.orderDraftId })
+              if (checkRes.success) {
+                logger.info({ orderId: checkRes.order.id }, 'Order finalized successfully on webhook capture')
+              }
             } catch (err) {
-              logger.warn({ err: err.message, orderId: payment.orderId }, 'Failed to queue auto-reject on payment captured webhook')
+              logger.error({ err: err.message, draftId: payment.orderDraftId }, 'Failed to finalize order on webhook capture')
             }
+
             logger.info({ paymentId: payment.id }, 'Payment captured via webhook')
           }
         }

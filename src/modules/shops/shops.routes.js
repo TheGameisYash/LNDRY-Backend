@@ -1,6 +1,6 @@
-import { ShopsController } from './vendors.controller.js'
-import { ShopsService } from './vendors.service.js'
-import { ShopsRepository } from './vendors.repository.js'
+import { ShopsController } from './shops.controller.js'
+import { ShopsService } from './shops.service.js'
+import { ShopsRepository } from './shops.repository.js'
 
 /**
  * Shops routes plugin

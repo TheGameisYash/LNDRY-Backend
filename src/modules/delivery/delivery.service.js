@@ -220,13 +220,7 @@ export class DeliveryService {
       })
     }
 
-    const response = { ...result.assignment }
-    if (isPickup) {
-      response.pickupOtp = otp
-    } else {
-      response.deliveryOtp = otp
-    }
-    return response
+    return result.assignment
   }
 
   async rejectOrder(riderId, orderId, reason) {

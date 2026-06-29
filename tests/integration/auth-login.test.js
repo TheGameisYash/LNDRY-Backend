@@ -213,7 +213,7 @@ function setupStoreSingleShopUser() {
       }
     }
     // loadActiveShopAssignments
-    if (sql.includes('vendor_staff') && sql.includes('is_active')) {
+    if ((sql.includes('vendor_staff') || sql.includes('vendor_employees')) && sql.includes('is_active')) {
       return {
         rows: [{
           shop_staff_id: 'ss-1',
@@ -248,7 +248,7 @@ function setupStoreMultiShopUser() {
         }],
       }
     }
-    if (sql.includes('vendor_staff') && sql.includes('is_active')) {
+    if ((sql.includes('vendor_staff') || sql.includes('vendor_employees')) && sql.includes('is_active')) {
       return {
         rows: [
           {

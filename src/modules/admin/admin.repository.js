@@ -64,16 +64,16 @@ export class AdminRepository {
 
   async getTopProducts(limit = 20) {
     const { rows } = await query(
-      `SELECT p.id, p.name, p.price, p.images, p.total_sold,
+      `SELECT p.id, p.name,
               COUNT(DISTINCT oi.order_id) as order_count,
               COALESCE(SUM(oi.total), 0) as total_revenue,
               COALESCE(AVG(r.rating), 0) as avg_rating
-       FROM garment_rates p
-       LEFT JOIN order_items oi ON oi.garment_rate_id = p.id
-       LEFT JOIN reviews r ON r.garment_rate_id = p.id
-       WHERE p.is_available = true
-       GROUP BY p.id
-       ORDER BY p.total_sold DESC
+       FROM garment_types p
+       LEFT JOIN order_lines oi ON oi.garment_type_id = p.id
+       LEFT JOIN reviews r ON r.garment_type_id = p.id
+       WHERE p.is_active = true
+       GROUP BY p.id, p.name
+       ORDER BY total_revenue DESC
        LIMIT $1`,
       [limit]
     )
@@ -81,9 +81,9 @@ export class AdminRepository {
     return rows.map(r => ({
       id: r.id,
       name: r.name,
-      price: parseFloat(r.price),
-      image: r.images?.[0] || null,
-      totalSold: parseInt(r.total_sold),
+      price: 0,
+      image: null,
+      totalSold: parseInt(r.order_count),
       orderCount: parseInt(r.order_count),
       totalRevenue: parseFloat(r.total_revenue),
       avgRating: parseFloat(r.avg_rating),

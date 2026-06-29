@@ -57,9 +57,9 @@ export class AdminOrdersRepository {
 
   async getOrderItems(orderId) {
     const { rows } = await query(
-      `SELECT oi.*, p.thumbnail_url
-       FROM order_items oi
-       LEFT JOIN garment_rates p ON p.id = oi.garment_rate_id
+      `SELECT oi.*, null AS thumbnail_url
+       FROM order_lines oi
+       LEFT JOIN garment_types p ON p.id = oi.garment_type_id
        WHERE oi.order_id = $1
        ORDER BY oi.created_at`,
       [orderId]
@@ -224,13 +224,12 @@ export class AdminOrdersRepository {
       const orderItems = []
       for (const item of items) {
         const { rows: [product] } = await client.query(
-          'SELECT id, name, price, sale_price, stock_quantity, unit FROM garment_rates WHERE id = $1 AND is_active = true',
+          'SELECT id, name, unit FROM garment_types WHERE id = $1 AND is_active = true',
           [item.productId]
         )
-        if (!product) throw { statusCode: 400, message: `Product ${item.productId} not found` }
-        if (product.stock_quantity < item.quantity) throw { statusCode: 400, message: `${product.name} out of stock` }
+        if (!product) throw { statusCode: 400, message: `Garment type ${item.productId} not found` }
 
-        const price = product.sale_price || product.price
+        const price = item.price || 0
         const total = price * item.quantity
         subtotal += total
         orderItems.push({
@@ -244,11 +243,11 @@ export class AdminOrdersRepository {
       }
 
       // Generate order number
-      const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`
+      const orderNumber = `LNDR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`
 
       const { rows: [order] } = await client.query(
         `INSERT INTO orders (order_number, user_id, status, items, subtotal, total_amount, payment_method, payment_status, delivery_address)
-         VALUES ($1, $2, 'CONFIRMED', $3, $4, $5, $6, $7, $8)
+         VALUES ($1, $2, 'VENDOR_ACCEPTED', $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
           orderNumber, userId, JSON.stringify(orderItems),
@@ -261,21 +260,16 @@ export class AdminOrdersRepository {
       // Insert order items
       for (const oi of orderItems) {
         await client.query(
-          `INSERT INTO order_items (order_id, garment_rate_id, name, price, quantity, unit, total)
+          `INSERT INTO order_lines (order_id, garment_type_id, name, price, quantity, unit, total)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [order.id, oi.garment_rate_id, oi.name, oi.price, oi.quantity, oi.unit, oi.total]
-        )
-        // Deduct stock
-        await client.query(
-          'UPDATE garment_rates SET stock_quantity = stock_quantity - $1, total_sold = total_sold + $1 WHERE id = $2',
-          [oi.quantity, oi.garment_rate_id]
         )
       }
 
       // Log initial status
       await client.query(
         `INSERT INTO order_status_history (order_id, from_status, to_status, changed_by, note)
-         VALUES ($1, NULL, 'CONFIRMED', $2, 'Manual order by admin')`,
+         VALUES ($1, NULL, 'VENDOR_ACCEPTED', $2, 'Manual order by admin')`,
         [order.id, adminId]
       )
 

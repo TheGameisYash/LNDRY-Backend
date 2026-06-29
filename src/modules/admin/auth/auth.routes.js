@@ -5,6 +5,7 @@ import {
   adminLoginSchema,
   selectShopSchema,
   meSchema,
+  myShopsSchema,
   changePasswordSchema,
   verify2faSchema,
   enable2faSchema,
@@ -106,6 +107,22 @@ export default async function adminAuthRoutes(fastify) {
       },
     },
     controller.me.bind(controller),
+  )
+
+  // GET /my-shops — returns active shop assignments for the requester
+  fastify.get(
+    '/my-shops',
+    {
+      schema: myShopsSchema,
+      preHandler: [fastify.authenticate, requireNoForcePassword],
+      config: {
+        rateLimit: {
+          max: 60,
+          timeWindow: '60 seconds',
+        },
+      },
+    },
+    controller.myShops.bind(controller),
   )
 
   // POST /change-password — the one route that must remain reachable

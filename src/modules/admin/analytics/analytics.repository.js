@@ -52,25 +52,33 @@ export class AdminAnalyticsRepository {
     if (endDate) { params.push(endDate); dateFilter += ` AND o.created_at <= $${params.length}` }
 
     const { rows } = await query(
-      `SELECT p.id, p.name, p.thumbnail_url, c.name AS category,
+      `SELECT p.id, p.name, c.name AS category,
               SUM(oi.quantity)::int AS units_sold,
               SUM(oi.total) AS revenue,
               COUNT(DISTINCT o.user_id)::int AS unique_buyers,
-              COALESCE(pv.views, 0)::int AS views,
-              CASE WHEN COALESCE(pv.views, 0) > 0
-                THEN ROUND(SUM(oi.quantity)::numeric / pv.views * 100, 2) ELSE 0 END AS conversion_rate
-       FROM order_items oi
+              0::int AS views,
+              0::numeric AS conversion_rate
+       FROM order_lines oi
        JOIN orders o ON o.id = oi.order_id
-       JOIN garment_rates p ON p.id = oi.garment_rate_id
-       LEFT JOIN categories c ON c.id = p.category_id
-       LEFT JOIN (SELECT garment_rate_id, COUNT(*)::int AS views FROM product_views GROUP BY garment_rate_id) pv ON pv.garment_rate_id = p.id
+       JOIN garment_types p ON p.id = oi.garment_type_id
+       LEFT JOIN service_categories c ON c.id = p.category_id
        ${dateFilter}
-       GROUP BY p.id, p.name, p.thumbnail_url, c.name, pv.views
+       GROUP BY p.id, p.name, c.name
        ORDER BY revenue DESC
        LIMIT $1`,
       params
     )
-    return rows.map(r => ({ ...r, revenue: parseFloat(r.revenue), conversion_rate: parseFloat(r.conversion_rate) }))
+    return rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      thumbnail_url: null,
+      category: r.category,
+      units_sold: r.units_sold,
+      revenue: parseFloat(r.revenue),
+      unique_buyers: r.unique_buyers,
+      views: 0,
+      conversion_rate: 0
+    }))
   }
 
   async getCustomerCohorts() {
@@ -170,7 +178,7 @@ export class AdminAnalyticsRepository {
       `SELECT 0 AS gst_rate,
               SUM(oi.total) AS taxable_amount,
               0 AS gst_amount
-       FROM order_items oi
+       FROM order_lines oi
        JOIN orders o ON o.id = oi.order_id
        ${dateFilter}`,
       params

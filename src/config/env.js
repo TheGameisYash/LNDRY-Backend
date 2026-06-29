@@ -67,6 +67,7 @@ const envSchema = z.object({
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
   RAZORPAY_CURRENCY: z.string().default('INR'),
+  ALLOW_MOCK_PAYMENT: booleanFromEnv.default(false),
 
   // Cloudinary
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
@@ -145,6 +146,7 @@ const envSchema = z.object({
   ALLOW_DEMO_DELIVERY_ACTIONS: booleanFromEnv.default(false),
 
   // Delivery
+  GOOGLE_MAPS_API_KEY: z.string().optional(),
   DELIVERY_RADIUS_KM: z.coerce.number().default(10),
   EXPRESS_DELIVERY_MINUTES: z.coerce.number().default(30),
   PLATFORM_FEE: z.coerce.number().default(5),

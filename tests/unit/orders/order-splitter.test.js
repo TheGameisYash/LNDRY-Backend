@@ -552,7 +552,7 @@ describe('OrderSplitterService.createOrders — happy path', () => {
     expect(b.totalAmount).toBe(605)
   })
 
-  it('selects WAITING_FOR_VENDOR_CONFIRMATION status for all payments', async () => {
+  it('selects WAITING_VENDOR_CONFIRMATION status for all payments', async () => {
     const ordersRepo = makeOrdersRepoMock()
     const shopProductsRepo = makeShopProductsRepoMock()
 
@@ -573,7 +573,7 @@ describe('OrderSplitterService.createOrders — happy path', () => {
       { productId: PROD_1, shopId: SHOP_A, shopProductId: SP_A1, quantity: 1, lineTotal: 100, salePrice: 100, name: 'P1' },
     ])
 
-    // COD → WAITING_FOR_VENDOR_CONFIRMATION
+    // COD → WAITING_VENDOR_CONFIRMATION
     await svc.createOrders({
       client: makeClientMock(),
       userId: USER_ID,
@@ -581,7 +581,7 @@ describe('OrderSplitterService.createOrders — happy path', () => {
       deliveryAddress: {},
       payment: { method: 'COD' },
     })
-    expect(ordersRepo.create.mock.calls[0][1].status).toBe('WAITING_FOR_VENDOR_CONFIRMATION')
+    expect(ordersRepo.create.mock.calls[0][1].status).toBe('WAITING_VENDOR_CONFIRMATION')
 
     // Reset & try ONLINE
     ordersRepo.create.mockClear()
@@ -600,7 +600,7 @@ describe('OrderSplitterService.createOrders — happy path', () => {
       deliveryAddress: {},
       payment: { method: 'UPI', status: 'PENDING' },
     })
-    expect(ordersRepo.create.mock.calls[0][1].status).toBe('WAITING_FOR_VENDOR_CONFIRMATION')
+    expect(ordersRepo.create.mock.calls[0][1].status).toBe('WAITING_VENDOR_CONFIRMATION')
   })
 })
 

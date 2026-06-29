@@ -26,7 +26,7 @@ export class SlotsService {
     const { rows: counts } = await query(
       `SELECT
          slot_id,
-         (SELECT COUNT(*)::int FROM slot_holds WHERE slot_id = vs.id AND booking_date = $1 AND expires_at > NOW()) AS holds_count,
+         (SELECT COUNT(*)::int FROM slot_holds WHERE slot_id = vs.id AND booking_date = $1 AND expires_at > NOW() AND status = 'ACTIVE') AS holds_count,
          (SELECT COUNT(*)::int FROM orders WHERE vendor_slot_id = vs.id AND pickup_date = $1 AND status NOT IN ('PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')) AS orders_count
        FROM vendor_slots vs
        WHERE vs.id = ANY($2::uuid[])`,
@@ -46,7 +46,7 @@ export class SlotsService {
         maxOrders: slot.max_orders,
         remainingCapacity: remaining
       }
-    })
+    }).filter(slot => slot.remainingCapacity > 0)
   }
 
   async holdSlot(userId, vendorId, slotId, bookingDate, quoteId) {
@@ -83,7 +83,7 @@ export class SlotsService {
 
       // 2. Count current active holds and orders
       const { rows: holdRows } = await client.query(
-        `SELECT COUNT(*)::int AS count FROM slot_holds WHERE slot_id = $1 AND booking_date = $2 AND expires_at > NOW()`,
+        `SELECT COUNT(*)::int AS count FROM slot_holds WHERE slot_id = $1 AND booking_date = $2 AND expires_at > NOW() AND status = 'ACTIVE'`,
         [slotId, bookingDate]
       )
       const { rows: orderRows } = await client.query(
@@ -98,8 +98,8 @@ export class SlotsService {
 
       // 3. Create short-lived hold (10 min expiry)
       const { rows: hold } = await client.query(
-        `INSERT INTO slot_holds (vendor_id, slot_id, customer_id, user_id, quote_id, booking_date, expires_at)
-         VALUES ($1, $2, $3, $3, $4, $5, NOW() + INTERVAL '10 minutes')
+        `INSERT INTO slot_holds (vendor_id, slot_id, customer_id, user_id, quote_id, booking_date, expires_at, status)
+         VALUES ($1, $2, $3, $3, $4, $5, NOW() + INTERVAL '10 minutes', 'ACTIVE')
          RETURNING id, expires_at`,
         [vendorId, slotId, userId, quoteId, bookingDate]
       )
@@ -116,10 +116,10 @@ export class SlotsService {
     }
   }
 
-  async releaseHold(holdId) {
+  async releaseHold(userId, holdId) {
     const { rowCount } = await query(
-      `DELETE FROM slot_holds WHERE id = $1`,
-      [holdId]
+      `UPDATE slot_holds SET status = 'RELEASED', updated_at = NOW() WHERE id = $1 AND customer_id = $2 AND status = 'ACTIVE'`,
+      [holdId, userId]
     )
     return rowCount > 0
   }

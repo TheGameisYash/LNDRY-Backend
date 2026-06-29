@@ -663,6 +663,31 @@ export class AdminAuthService {
     }
   }
 
+  /**
+   * Fetch assignments for the /my-shops endpoint.
+   */
+  async myShops({ userId, ip = null, userAgent = null } = {}) {
+    const user = await this.repository.findUserById(userId)
+    if (!user) {
+      throw {
+        statusCode: 401,
+        code: ERROR_CODES.SESSION_INVALID,
+        message: 'Session is no longer valid',
+      }
+    }
+    if (user.is_active === false || user.is_blocked === true) {
+      throw {
+        statusCode: 401,
+        code: ERROR_CODES.SESSION_INVALID,
+        message: 'Session is no longer valid',
+      }
+    }
+    const assignments = await this.repository.loadActiveShopAssignments(userId)
+    return {
+      shops: assignments.map(sanitizeAssignment)
+    }
+  }
+
   async setPassword(userId, newPassword) {
     if (!newPassword || newPassword.length < 8) {
       throw { statusCode: 400, message: 'Password must be at least 8 characters' }
@@ -1540,5 +1565,7 @@ function sanitizeAssignment(a) {
     shop_name: a.shop_name,
     branch_code: a.branch_code,
     shop_role: a.shop_role,
+    city: a.city,
+    is_active: a.is_active,
   }
 }

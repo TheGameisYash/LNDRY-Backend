@@ -438,7 +438,7 @@ export class OrderSplitterService {
 
       const orderNumber = await this.ordersRepo.generateOrderNumber(client)
 
-      const initialStatus = ORDER_STATUS.WAITING_FOR_VENDOR_CONFIRMATION
+      const initialStatus = ORDER_STATUS.WAITING_VENDOR_CONFIRMATION
 
       const order = await this.ordersRepo.create(
         client,

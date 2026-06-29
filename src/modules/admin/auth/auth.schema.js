@@ -75,6 +75,11 @@ export const meSchema = {
   summary: 'Fetch current dashboard user, role context, and vendors',
 }
 
+export const myShopsSchema = {
+  tags: ['Admin Auth'],
+  summary: 'List active shop assignments for the authenticated user [Authenticated]',
+}
+
 /**
  * `POST /api/v1/admin/auth/change-password` body schema.
  *

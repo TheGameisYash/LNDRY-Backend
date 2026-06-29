@@ -25,6 +25,9 @@ export default async function mapsRoutes(fastify) {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY
 
     if (!apiKey) {
+      if (env.NODE_ENV === 'production') {
+        return reply.code(400).send(error('Google Maps API key is missing', 'CONFIG_ERROR'))
+      }
       // Return structured mock fallback
       const mockSuggestions = [
         { description: 'Mock Address 1, Indiranagar, Bengaluru, Karnataka, India', place_id: 'mock_place_1' },
@@ -81,7 +84,14 @@ export default async function mapsRoutes(fastify) {
     const { placeId } = request.params
     const apiKey = process.env.GOOGLE_MAPS_API_KEY || env.GOOGLE_MAPS_API_KEY
 
-    if (!apiKey || placeId.startsWith('mock_place_')) {
+    if (placeId.startsWith('mock_place_') && env.NODE_ENV === 'production') {
+      return reply.code(400).send(error('Mock addresses are disabled in this environment', 'CONFIG_ERROR'))
+    }
+
+    if (!apiKey) {
+      if (env.NODE_ENV === 'production') {
+        return reply.code(400).send(error('Google Maps API key is missing', 'CONFIG_ERROR'))
+      }
       // Return structured mock fallback based on placeId
       let mockDetail = {
         formatted_address: 'Mock Address 1, Indiranagar, Bengaluru, Karnataka, India',

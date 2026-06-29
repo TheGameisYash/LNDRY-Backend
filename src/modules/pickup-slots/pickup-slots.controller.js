@@ -34,7 +34,7 @@ export class SlotsController {
   async releaseHold(request, reply) {
     const { holdId } = request.params
     try {
-      const released = await this.service.releaseHold(holdId)
+      const released = await this.service.releaseHold(request.user.id, holdId)
       if (!released) {
         return reply.code(404).send(error('Slot hold not found or already released', 'NOT_FOUND'))
       }

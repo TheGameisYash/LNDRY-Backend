@@ -330,7 +330,7 @@ export const adminUpdateStatusSchema = {
     properties: {
       status: {
         type: 'string',
-        enum: ['WAITING_FOR_VENDOR_CONFIRMATION', 'CONFIRMED', 'PREPARING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'],
+        enum: ['WAITING_VENDOR_CONFIRMATION', 'CONFIRMED', 'PREPARING', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'],
       },
     },
   },

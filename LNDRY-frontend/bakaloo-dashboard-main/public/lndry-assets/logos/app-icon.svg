@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">LNDRY app icon</title>
+  <desc id="desc">A violet rounded-square app icon with the white careline symbol.</desc>
+  <defs>
+    <linearGradient id="bg" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#887CF6"/>
+      <stop offset="0.52" stop-color="#6C63E8"/>
+      <stop offset="1" stop-color="#5046C8"/>
+    </linearGradient>
+    <filter id="lift" x="190" y="160" width="666" height="718" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#292266" flood-opacity="0.24"/>
+    </filter>
+  </defs>
+  <rect x="36" y="36" width="952" height="952" rx="230" fill="url(#bg)"/>
+  <g filter="url(#lift)">
+    <path d="M392 244v314c0 72.35 58.65 131 131 131h171" stroke="white" stroke-width="76" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M392 300v31M392 379v31M392 458v31" stroke="#D8D4FF" stroke-width="32" stroke-linecap="round"/>
+    <circle cx="392" cy="206" r="38" fill="white"/>
+    <circle cx="694" cy="689" r="38" fill="#5DE0D4"/>
+    <path d="M694 689c55-20 86-59 92-115" stroke="white" stroke-width="24" stroke-linecap="round"/>
+  </g>
+</svg>

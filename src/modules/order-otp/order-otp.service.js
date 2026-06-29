@@ -1,13 +1,14 @@
 import bcrypt from 'bcrypt'
 import { query } from '../../config/database.js'
+import { redis } from '../../config/redis.js'
 
 /**
- * Service to manage pickup and delivery OTPs using the order_otps table.
+ * Service to manage pickup and delivery OTPs using the order_otps table and Redis.
  */
 export class OrderOtpService {
   /**
    * Generate a 6-digit numeric OTP and store its hash in the database.
-   * Also updates the plaintext columns in the orders table so the customer can view it.
+   * Also stores the plaintext in Redis for customer-only retrieval.
    */
   async generateOtp(orderId, purpose) {
     // Generate a random 6-digit numeric string
@@ -32,8 +33,9 @@ export class OrderOtpService {
       [orderId, otpHash, purpose, expiresAt]
     )
 
-    // Plaintext OTP is NOT synced to the orders table to prevent insecure storage.
-    // It is returned so it can be sent to the customer via SMS/notification at generation time.
+    // Store plaintext OTP in Redis for secure, ephemeral customer retrieval
+    await redis.set(`order_otp:${orderId}:${purpose}`, rawOtp, 'EX', 24 * 60 * 60)
+
     return rawOtp
   }
 
@@ -72,12 +74,15 @@ export class OrderOtpService {
         [activeOtp.id]
       )
 
-      // Clear plaintext OTP from orders table
+      // Clear plaintext OTP from orders table (fixed place-holder bug by changing $2 to $1)
       const orderColumn = purpose === 'PICKUP' ? 'pickup_otp' : 'delivery_otp'
       await query(
-        `UPDATE orders SET ${orderColumn} = NULL, updated_at = NOW() WHERE id = $2`,
+        `UPDATE orders SET ${orderColumn} = NULL, updated_at = NOW() WHERE id = $1`,
         [orderId]
       )
+
+      // Delete from Redis
+      await redis.del(`order_otp:${orderId}:${purpose}`)
 
       return { success: true }
     } else {
@@ -88,7 +93,9 @@ export class OrderOtpService {
         [newAttempts, activeOtp.id]
       )
 
+      // Delete from Redis if locked
       if (newAttempts >= 5) {
+        await redis.del(`order_otp:${orderId}:${purpose}`)
         throw { statusCode: 400, message: 'Verification locked. Too many failed attempts.', code: 'OTP_LOCKED' }
       }
 
@@ -99,6 +106,38 @@ export class OrderOtpService {
         code: 'INVALID_OTP',
         attemptsRemaining: remaining
       }
+    }
+  }
+
+  /**
+   * Retrieve active OTP for customer order owner with Cache-Control no-store requirements.
+   */
+  async getActiveOtpForCustomer(userId, orderId, purpose) {
+    const { rows: orderRows } = await query('SELECT user_id FROM orders WHERE id = $1', [orderId])
+    if (orderRows.length === 0) {
+      throw { statusCode: 404, message: 'Order not found', code: 'ORDER_NOT_FOUND' }
+    }
+    if (orderRows[0].user_id !== userId) {
+      throw { statusCode: 403, message: 'Forbidden - order ownership check failed', code: 'FORBIDDEN' }
+    }
+
+    const plaintextOtp = await redis.get(`order_otp:${orderId}:${purpose}`)
+    const { rows } = await query(
+      `SELECT expires_at, attempt_count FROM order_otps 
+       WHERE order_id = $1 AND purpose = $2 AND used_at IS NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [orderId, purpose]
+    )
+    const active = rows[0]
+    if (!active || new Date(active.expires_at) < new Date()) {
+      return null
+    }
+
+    return {
+      otp: plaintextOtp || null,
+      purpose,
+      expires_at: active.expires_at,
+      attempts_remaining: Math.max(0, 5 - active.attempt_count)
     }
   }
 }

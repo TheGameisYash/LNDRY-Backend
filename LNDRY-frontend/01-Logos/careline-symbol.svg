@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">LNDRY careline symbol</title>
+  <desc id="desc">A rounded L-shaped garment seam with three stitches and a thread node.</desc>
+  <path d="M22 10v31c0 7.18 5.82 13 13 13h17" stroke="#6C63E8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M22 15v3M22 23v3M22 31v3" stroke="#EAE8FF" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="22" cy="7" r="3.5" fill="#6C63E8"/>
+  <circle cx="52" cy="54" r="3.5" fill="#0FB5A6"/>
+  <path d="M52 54c3.75-1.5 5.9-4.4 6.5-8.5" stroke="#6C63E8" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

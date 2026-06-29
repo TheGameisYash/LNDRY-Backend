@@ -427,12 +427,13 @@ export class VendorsService {
     const where = conditions.join(' AND ')
 
     const { rows } = await query(
-      `SELECT vs.id, vs.price, vs.is_available, gr.id as garment_rate_id, gr.name as garment_name, gr.unit, gr.category_id, c.name as category_name
+      `SELECT vs.id, vs.name, vs.description, vs.inclusions, vs.exclusions,
+              vs.completion_time_hours, vs.image_asset_id, vs.status, vs.is_available,
+              vs.category_id, sc.name AS category_name
        FROM vendor_services vs
-       JOIN garment_rates gr ON vs.garment_rate_id = gr.id
-       JOIN categories c ON gr.category_id = c.id
+       LEFT JOIN service_categories sc ON vs.category_id = sc.id
        WHERE ${where}
-       ORDER BY c.name, gr.name
+       ORDER BY sc.name, vs.name
        LIMIT $${idx} OFFSET $${idx + 1}`,
       [...params, limit, offset]
     )
@@ -440,7 +441,6 @@ export class VendorsService {
     const countRes = await query(
       `SELECT COUNT(*)::int as total
        FROM vendor_services vs
-       JOIN garment_rates gr ON vs.garment_rate_id = gr.id
        WHERE ${where}`,
       params
     )
@@ -457,99 +457,136 @@ export class VendorsService {
     const vendor = await this.repo.findByUserId(userId)
     if (!vendor) throw { statusCode: 404, message: 'Vendor profile not found' }
 
-    const { rows: grs } = await query('SELECT id, price FROM garment_rates WHERE category_id = $1 AND is_active = true', [categoryId])
-    if (grs.length === 0) {
-      throw { statusCode: 400, message: 'No active garments found in this category' }
-    }
+    const catRes = await query('SELECT name, description FROM service_categories WHERE id = $1', [categoryId])
+    const cat = catRes.rows[0]
+    if (!cat) throw { statusCode: 404, message: 'Service category not found' }
 
-    for (const gr of grs) {
+    const { rows: vsRows } = await query(
+      `INSERT INTO vendor_services (vendor_id, category_id, name, description, status, is_available)
+       VALUES ($1, $2, $3, $4, 'DRAFT', false)
+       ON CONFLICT (vendor_id, category_id) DO UPDATE SET deleted_at = NULL, status = 'DRAFT'
+       RETURNING id, status`,
+      [vendor.id, categoryId, cat.name, cat.description]
+    )
+    const vs = vsRows[0]
+
+    const { rows: gts } = await query('SELECT id FROM garment_types WHERE category_id = $1 AND is_active = true', [categoryId])
+    for (const gt of gts) {
       await query(
-        `INSERT INTO vendor_services (vendor_id, garment_rate_id, price, is_available)
-         VALUES ($1, $2, $3, false)
-         ON CONFLICT (vendor_id, garment_rate_id) DO UPDATE SET deleted_at = NULL`,
-        [vendor.id, gr.id, gr.price]
+        `INSERT INTO vendor_service_rates (vendor_service_id, garment_type_id, rate_paise, is_active)
+         VALUES ($1, $2, 0, true)
+         ON CONFLICT (vendor_service_id, garment_type_id) DO UPDATE SET is_active = true`,
+        [vs.id, gt.id]
       )
     }
 
-    return { success: true, message: 'Draft service created' }
+    return { id: vs.id, status: vs.status, category_id: categoryId, name: cat.name }
   }
 
-  async getVendorServiceDetails(userId, categoryId) {
+  async getVendorServiceDetails(userId, serviceId) {
     const vendor = await this.repo.findByUserId(userId)
     if (!vendor) throw { statusCode: 404, message: 'Vendor profile not found' }
 
-    const { rows } = await query(
-      `SELECT gr.id as garment_rate_id, gr.name as garment_name, gr.unit, gr.price as base_price,
-              vs.id as vendor_service_id, vs.price as override_price, vs.is_available
-       FROM garment_rates gr
-       LEFT JOIN vendor_services vs ON vs.garment_rate_id = gr.id AND vs.vendor_id = $1 AND vs.deleted_at IS NULL
-       WHERE gr.category_id = $2 AND gr.is_active = true`,
-      [vendor.id, categoryId]
+    const serviceRes = await query(
+      `SELECT vs.id, vs.name, vs.description, vs.inclusions, vs.exclusions, 
+              vs.completion_time_hours, vs.image_asset_id, vs.status, vs.is_available, vs.category_id,
+              sc.name AS category_name
+       FROM vendor_services vs
+       LEFT JOIN service_categories sc ON vs.category_id = sc.id
+       WHERE vs.id = $1 AND vs.vendor_id = $2 AND vs.deleted_at IS NULL`,
+      [serviceId, vendor.id]
     )
 
-    const catRes = await query('SELECT name, description FROM categories WHERE id = $1', [categoryId])
+    const service = serviceRes.rows[0]
+    if (!service) throw { statusCode: 404, message: 'Vendor service not found' }
+
+    const { rows: rates } = await query(
+      `SELECT vsr.id AS rate_id, vsr.rate_paise, vsr.is_active,
+              gt.id AS garment_type_id, gt.name AS garment_name, gt.unit
+       FROM vendor_service_rates vsr
+       JOIN garment_types gt ON vsr.garment_type_id = gt.id
+       WHERE vsr.vendor_service_id = $1 AND gt.is_active = true`,
+      [serviceId]
+    )
 
     return {
-      category: catRes.rows[0] || null,
-      garments: rows
+      category: { name: service.category_name, id: service.category_id },
+      service,
+      garments: rates.map(r => ({
+        garment_rate_id: r.garment_type_id,
+        garment_name: r.garment_name,
+        unit: r.unit,
+        rate_paise: r.rate_paise,
+        is_available: r.is_active,
+        vendor_service_id: serviceId
+      }))
     }
   }
 
-  async updateVendorService(userId, categoryId, isAvailable) {
+  async updateVendorService(userId, serviceId, isAvailable) {
     const vendor = await this.repo.findByUserId(userId)
     if (!vendor) throw { statusCode: 404, message: 'Vendor profile not found' }
 
     await query(
-      `UPDATE vendor_services vs
+      `UPDATE vendor_services
        SET is_available = $1, updated_at = NOW()
-       FROM garment_rates gr
-       WHERE vs.garment_rate_id = gr.id AND vs.vendor_id = $2 AND gr.category_id = $3`,
-      [isAvailable, vendor.id, categoryId]
+       WHERE id = $2 AND vendor_id = $3`,
+      [isAvailable, serviceId, vendor.id]
     )
 
     return { success: true }
   }
 
-  async deleteVendorService(userId, categoryId) {
+  async deleteVendorService(userId, serviceId) {
     const vendor = await this.repo.findByUserId(userId)
     if (!vendor) throw { statusCode: 404, message: 'Vendor profile not found' }
 
     await query(
-      `UPDATE vendor_services vs
+      `UPDATE vendor_services
        SET deleted_at = NOW(), updated_at = NOW()
-       FROM garment_rates gr
-       WHERE vs.garment_rate_id = gr.id AND vs.vendor_id = $1 AND gr.category_id = $2`,
-      [vendor.id, categoryId]
+       WHERE id = $1 AND vendor_id = $2`,
+      [serviceId, vendor.id]
     )
 
     return { success: true }
   }
 
-  async addGarmentRate(userId, categoryId, data) {
+  async addGarmentRate(userId, serviceId, data) {
     const vendor = await this.repo.findByUserId(userId)
     if (!vendor) throw { statusCode: 404, message: 'Vendor profile not found' }
 
-    const slug = slugify(data.garment_type_name, { lower: true, strict: true }) + '-' + Math.random().toString(36).substring(2, 6)
-    const priceRupees = data.rate_paise / 100
+    const vsRes = await query('SELECT category_id FROM vendor_services WHERE id = $1 AND vendor_id = $2', [serviceId, vendor.id])
+    const vs = vsRes.rows[0]
+    if (!vs) throw { statusCode: 404, message: 'Vendor service not found' }
 
-    const { rows: grs } = await query(
-      `INSERT INTO garment_rates (name, slug, unit, price, category_id, is_active)
-       VALUES ($1, $2, $3, $4, $5, true)
-       RETURNING id, name, unit, price`,
-      [data.garment_type_name, slug, data.rate_unit || 'piece', priceRupees, categoryId]
-    )
+    let gtId = data.garment_type_id
+    if (!gtId && data.garment_type_name) {
+      const slug = slugify(data.garment_type_name, { lower: true, strict: true }) + '-' + Math.random().toString(36).substring(2, 6)
+      const gtRes = await query(
+        `INSERT INTO garment_types (name, slug, unit, category_id, is_active)
+         VALUES ($1, $2, $3, $4, true)
+         ON CONFLICT (slug) DO UPDATE SET is_active = true
+         RETURNING id`,
+        [data.garment_type_name, slug, data.rate_unit || 'piece', vs.category_id]
+      )
+      gtId = gtRes.rows[0].id
+    }
 
-    const grId = grs[0].id
+    if (!gtId) throw { statusCode: 400, message: 'garment_type_id or garment_type_name is required' }
+
+    const ratePaise = parseInt(data.rate_paise, 10) || 0
     await query(
-      `INSERT INTO vendor_services (vendor_id, garment_rate_id, price, is_available)
-       VALUES ($1, $2, $3, true)`,
-      [vendor.id, grId, priceRupees]
+      `INSERT INTO vendor_service_rates (vendor_service_id, garment_type_id, rate_paise, is_active)
+       VALUES ($1, $2, $3, true)
+       ON CONFLICT (vendor_service_id, garment_type_id)
+       DO UPDATE SET rate_paise = $3, is_active = true`,
+      [serviceId, gtId, ratePaise]
     )
 
-    return grs[0]
+    return { garment_type_id: gtId, rate_paise: ratePaise, is_available: true }
   }
 
-  async updateGarmentRate(userId, categoryId, garmentRateId, data) {
+  async updateGarmentRate(userId, serviceId, garmentTypeId, data) {
     const vendor = await this.repo.findByUserId(userId)
     if (!vendor) throw { statusCode: 404, message: 'Vendor profile not found' }
 
@@ -558,66 +595,67 @@ export class VendorsService {
     let idx = 1
 
     if (data.rate_paise !== undefined) {
-      updates.push(`price = $${idx++}`)
-      params.push(data.rate_paise / 100)
+      updates.push(`rate_paise = $${idx++}`)
+      params.push(parseInt(data.rate_paise, 10) || 0)
     }
 
     if (data.is_available !== undefined) {
-      updates.push(`is_available = $${idx++}`)
-      params.push(data.is_available)
+      updates.push(`is_active = $${idx++}`)
+      params.push(data.is_available === true)
     }
 
     if (updates.length === 0) return { success: true }
 
-    params.push(vendor.id, garmentRateId)
+    params.push(serviceId, garmentTypeId)
     await query(
-      `UPDATE vendor_services
+      `UPDATE vendor_service_rates
        SET ${updates.join(', ')}, updated_at = NOW()
-       WHERE vendor_id = $${idx} AND garment_rate_id = $${idx + 1}`,
+       WHERE vendor_service_id = $${idx} AND garment_type_id = $${idx + 1}`,
       params
     )
 
     return { success: true }
   }
 
-  async deleteGarmentRate(userId, categoryId, garmentRateId) {
+  async deleteGarmentRate(userId, serviceId, garmentTypeId) {
     const vendor = await this.repo.findByUserId(userId)
     if (!vendor) throw { statusCode: 404, message: 'Vendor profile not found' }
 
     await query(
-      `UPDATE vendor_services
-       SET deleted_at = NOW(), updated_at = NOW()
-       WHERE vendor_id = $1 AND garment_rate_id = $2`,
-      [vendor.id, garmentRateId]
+      `UPDATE vendor_service_rates
+       SET is_active = false, updated_at = NOW()
+       WHERE vendor_service_id = $1 AND garment_type_id = $2`,
+      [serviceId, garmentTypeId]
     )
 
     return { success: true }
   }
 
-  async bulkUpsertGarmentRates(userId, categoryId, items) {
+  async bulkUpsertGarmentRates(userId, serviceId, items) {
     const vendor = await this.repo.findByUserId(userId)
     if (!vendor) throw { statusCode: 404, message: 'Vendor profile not found' }
 
     for (const item of items) {
-      const priceRupees = item.rate_paise / 100
+      const ratePaise = parseInt(item.rate_paise, 10) || 0
+      const garmentTypeId = item.garment_type_id || item.garment_rate_id
       await query(
-        `INSERT INTO vendor_services (vendor_id, garment_rate_id, price, is_available)
+        `INSERT INTO vendor_service_rates (vendor_service_id, garment_type_id, rate_paise, is_active)
          VALUES ($1, $2, $3, $4)
-         ON CONFLICT (vendor_id, garment_rate_id)
-         DO UPDATE SET price = $3, is_available = $4, deleted_at = NULL, updated_at = NOW()`,
-        [vendor.id, item.garment_rate_id, priceRupees, item.is_available !== false]
+         ON CONFLICT (vendor_service_id, garment_type_id)
+         DO UPDATE SET rate_paise = $3, is_active = $4, updated_at = NOW()`,
+        [serviceId, garmentTypeId, ratePaise, item.is_available !== false]
       )
     }
 
     return { success: true }
   }
 
-  async publishService(userId, categoryId) {
-    return this.updateVendorService(userId, categoryId, true)
+  async publishService(userId, serviceId) {
+    return this.updateVendorService(userId, serviceId, true)
   }
 
-  async unpublishService(userId, categoryId, reason) {
-    return this.updateVendorService(userId, categoryId, false)
+  async unpublishService(userId, serviceId, reason) {
+    return this.updateVendorService(userId, serviceId, false)
   }
 
   async getCapacity(userId) {

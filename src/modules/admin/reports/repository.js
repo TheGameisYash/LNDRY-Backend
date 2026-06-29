@@ -240,22 +240,22 @@ export class AdminReportsRepository {
     const where = prefixed.length > 0 ? `WHERE ${prefixed.join(' AND ')}` : ''
 
     const countResult = await query(
-      `SELECT COUNT(DISTINCT oi.garment_rate_id) as total
-       FROM order_items oi
+      `SELECT COUNT(DISTINCT oi.garment_type_id) as total
+       FROM order_lines oi
        JOIN orders o ON o.id = oi.order_id
        ${where}`,
       values
     )
 
     const dataResult = await query(
-      `SELECT oi.garment_rate_id, p.name as product_name,
+      `SELECT oi.garment_type_id as garment_rate_id, p.name as product_name,
               SUM(oi.quantity) as total_quantity,
               SUM(oi.price * oi.quantity) as total_revenue
-       FROM order_items oi
+       FROM order_lines oi
        JOIN orders o ON o.id = oi.order_id
-       JOIN garment_rates p ON p.id = oi.garment_rate_id
+       JOIN garment_types p ON p.id = oi.garment_type_id
        ${where}
-       GROUP BY oi.garment_rate_id, p.name
+       GROUP BY oi.garment_type_id, p.name
        ORDER BY total_quantity DESC
        LIMIT $${nextIndex} OFFSET $${nextIndex + 1}`,
       [...values, limit, offset]

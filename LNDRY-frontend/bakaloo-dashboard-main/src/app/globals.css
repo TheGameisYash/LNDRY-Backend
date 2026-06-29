@@ -1,0 +1,165 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    /* ── Shadcn base variables (LNDRY Violet theme) ── */
+    --background: 240 25% 98%;
+    --foreground: 220 14% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 14% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 14% 10%;
+    --primary: 244 72% 65%; /* LNDRY Primary Violet #6C63E8 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 16% 96%;
+    --secondary-foreground: 220 14% 10%;
+    --muted: 240 16% 96%;
+    --muted-foreground: 240 10% 45%;
+    --accent: 244 80% 95%; /* LNDRY Soft Lavender #EAE8FF */
+    --accent-foreground: 245 72% 52%; /* LNDRY Deep Violet #5046C8 */
+    --destructive: 353 66% 56%; /* LNDRY Error #D94557 */
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 15% 92%;
+    --input: 240 15% 92%;
+    --ring: 244 72% 65%;
+    --chart-1: 244 72% 65%; /* Violet */
+    --chart-2: 173 85% 38%; /* Teal Accent */
+    --chart-3: 263 70% 58%;
+    --chart-4: 343 85% 60%;
+    --chart-5: 198 84% 49%;
+    --radius: 0.5rem;
+
+    /* ── Brand Colors (direct hex for custom components) ── */
+    --brand-50: #EAE8FF;
+    --brand-100: #D8D4FF;
+    --brand-200: #B8B0FF;
+    --brand-300: #988CFF;
+    --brand-400: #887CF6;
+    --brand-500: #6C63E8;
+    --brand-600: #5046C8;
+    --brand-700: #3E34A0;
+    --brand-800: #2C2278;
+    --brand-900: #1E1854;
+
+    /* ── Semantic ── */
+    --success: #16A36A; /* LNDRY Success */
+    --success-bg: #ECFDF5;
+    --warning: #F3A929; /* LNDRY Warning */
+    --warning-bg: #FFFBEB;
+    --danger: #D94557; /* LNDRY Error */
+    --danger-bg: #FEF2F2;
+    --info: #0FB5A6; /* LNDRY Teal */
+    --info-bg: #DDF7F3; /* LNDRY Teal Tint */
+
+    /* ── Surface ── */
+    --surface-bg: #F4F3FB; /* LNDRY App Background */
+    --surface-card: #FFFFFF;
+    --surface-sidebar: #FFFFFF;
+
+    /* ── Shadows ── */
+    --shadow-xs: 0 1px 2px rgba(42, 36, 95, 0.05);
+    --shadow-sm: 0 1px 3px rgba(42, 36, 95, 0.08), 0 1px 2px rgba(42, 36, 95, 0.04);
+    --shadow-md: 0 4px 16px rgba(42, 36, 95, 0.08); /* LNDRY Soft Surface */
+    --shadow-lg: 0 12px 32px rgba(67, 55, 145, 0.10); /* LNDRY Elevated Surface */
+    --shadow-xl: 0 20px 25px rgba(67, 55, 145, 0.12);
+
+    /* ── Layout ── */
+    --sidebar-width: 260px;
+    --sidebar-collapsed: 72px;
+    --header-height: 64px;
+  }
+
+  .dark {
+    /* ── Shadcn base variables (dark violet theme) ── */
+    --background: 240 25% 10%;
+    --foreground: 240 20% 95%;
+    --card: 240 25% 12%;
+    --card-foreground: 240 20% 95%;
+    --popover: 240 25% 12%;
+    --popover-foreground: 240 20% 95%;
+    --primary: 244 72% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 20% 15%;
+    --secondary-foreground: 240 20% 95%;
+    --muted: 240 20% 15%;
+    --muted-foreground: 240 10% 65%;
+    --accent: 244 40% 18%;
+    --accent-foreground: 244 72% 80%;
+    --destructive: 353 66% 56%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 20% 18%;
+    --input: 240 20% 18%;
+    --ring: 244 72% 65%;
+    --chart-1: 244 72% 65%;
+    --chart-2: 173 85% 38%;
+    --chart-3: 263 70% 58%;
+    --chart-4: 343 85% 60%;
+    --chart-5: 198 84% 49%;
+
+    /* ── Brand Colors (dark mode) ── */
+    --brand-50: rgba(108, 99, 232, 0.15);
+    --brand-100: rgba(108, 99, 232, 0.25);
+    --brand-500: #6C63E8;
+
+    /* ── Semantic (dark mode) ── */
+    --success: #34D399;
+    --success-bg: rgba(22, 163, 106, 0.15);
+    --warning: #FBBF24;
+    --warning-bg: rgba(243, 169, 41, 0.15);
+    --danger: #F87171;
+    --danger-bg: rgba(217, 69, 87, 0.15);
+    --info: #0FB5A6;
+    --info-bg: rgba(15, 181, 166, 0.15);
+
+    /* ── Surface (dark mode) ── */
+    --surface-bg: #0d0b18;
+    --surface-card: hsl(240 25% 12%);
+    --surface-sidebar: hsl(240 25% 11%);
+
+    /* ── Shadows (dark mode) ── */
+    --shadow-xs: 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.3);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.4), 0 4px 6px rgba(0,0,0,0.3);
+    --shadow-xl: 0 20px 25px rgba(0,0,0,0.45), 0 10px 10px rgba(0,0,0,0.3);
+  }
+}
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+
+/* ── Shimmer skeleton animation ── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--border)) 50%, hsl(var(--muted)) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ── Stat card primary gradient (LNDRY Violet to Electric Lavender) ── */
+.stat-card-primary {
+  background: linear-gradient(135deg, #6C63E8 0%, #887CF6 100%);
+  box-shadow: 0 8px 24px rgba(108,99,232,0.25);
+}
+
+/* ── Focus ring ── */
+*:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}

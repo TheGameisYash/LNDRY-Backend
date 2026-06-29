@@ -23,7 +23,7 @@ export function createVendorAutoRejectProcessor() {
       return
     }
 
-    if (order.status !== 'WAITING_FOR_VENDOR_CONFIRMATION') {
+    if (order.status !== 'WAITING_VENDOR_CONFIRMATION') {
       logger.info({ orderId, status: order.status }, 'Order is no longer waiting for vendor confirmation')
       return
     }
@@ -37,7 +37,7 @@ export function createVendorAutoRejectProcessor() {
     // Write immutable event to order_events
     await query(
       `INSERT INTO order_events (order_id, old_status, new_status, actor_id, actor_role, note)
-       VALUES ($1, 'WAITING_FOR_VENDOR_CONFIRMATION', 'AUTO_REJECTED', NULL, 'SYSTEM', 'Auto-rejected due to vendor response timeout')`,
+       VALUES ($1, 'WAITING_VENDOR_CONFIRMATION', 'AUTO_REJECTED', NULL, 'SYSTEM', 'Auto-rejected due to vendor response timeout')`,
       [orderId]
     )
 

@@ -1131,37 +1131,76 @@ export class OrdersService {
       }
     }
 
-    const draftRes = await query('SELECT * FROM order_drafts WHERE id = $1 AND user_id = $2', [orderDraftId, userId])
-    const draft = draftRes.rows[0]
-    if (!draft) {
-      return { success: false, message: 'Order draft not found', code: 'DRAFT_NOT_FOUND' }
-    }
-
-    // Verify payment is verified (PAID)
-    const paymentRes = await query('SELECT * FROM payments WHERE order_draft_id = $1 AND status = \'PAID\' LIMIT 1', [orderDraftId])
-    const payment = paymentRes.rows[0]
-    if (!payment) {
-      return { success: false, message: 'Payment not verified. Please complete payment first.', code: 'PAYMENT_PENDING' }
-    }
-
-    const snapshot = typeof draft.snapshot === 'string' ? JSON.parse(draft.snapshot) : draft.snapshot
     const client = await getClient()
 
     try {
       await client.query('BEGIN')
 
-      // Generate order number LNDR-YYYYMMDD-XXX
+      // 1. Lock draft FOR UPDATE
+      const draftRes = await client.query('SELECT * FROM order_drafts WHERE id = $1 AND user_id = $2 FOR UPDATE', [orderDraftId, userId])
+      const draft = draftRes.rows[0]
+      if (!draft) {
+        throw { statusCode: 404, message: 'Order draft not found', code: 'DRAFT_NOT_FOUND' }
+      }
+
+      // 2. Lock payment FOR UPDATE
+      const paymentRes = await client.query('SELECT * FROM payments WHERE order_draft_id = $1 AND status = \'PAID\' FOR UPDATE', [orderDraftId])
+      const payment = paymentRes.rows[0]
+      if (!payment) {
+        throw { statusCode: 400, message: 'Payment not verified. Please complete payment first.', code: 'PAYMENT_PENDING' }
+      }
+
+      const snapshot = typeof draft.snapshot === 'string' ? JSON.parse(draft.snapshot) : draft.snapshot
+      const quoteId = snapshot.quote?.quote_id || snapshot.quote?.id
+
+      // 3. Lock slot hold FOR UPDATE
+      const holdRes = await client.query(
+        'SELECT * FROM slot_holds WHERE customer_id = $1 AND slot_id = $2 AND vendor_id = $3 AND quote_id = $4 AND status = \'ACTIVE\' AND expires_at > NOW() FOR UPDATE',
+        [userId, draft.slot_id, draft.vendor_id, quoteId]
+      )
+      const hold = holdRes.rows[0]
+      if (!hold) {
+        throw { statusCode: 400, message: 'Pickup slot hold has expired or is invalid. Please request a new slot.', code: 'HOLD_EXPIRED' }
+      }
+
+      // 4. Lock vendor slot FOR UPDATE
+      const slotRes = await client.query(
+        'SELECT id, max_orders FROM vendor_slots WHERE id = $1 FOR UPDATE',
+        [draft.slot_id]
+      )
+      if (slotRes.rows.length === 0) {
+        throw { statusCode: 404, message: 'Vendor slot not found' }
+      }
+      const slot = slotRes.rows[0]
+
+      // 5. Enforce slot capacity under lock (exclude our locked hold)
+      const committedOrdersRes = await client.query(
+        `SELECT COUNT(*)::int AS count FROM orders 
+         WHERE vendor_slot_id = $1 AND pickup_date = $2 AND status NOT IN ('PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')`,
+        [draft.slot_id, snapshot.booking_date]
+      )
+      const activeHoldsRes = await client.query(
+        `SELECT COUNT(*)::int AS count FROM slot_holds 
+         WHERE slot_id = $1 AND booking_date = $2 AND expires_at > NOW() AND status = 'ACTIVE' AND id != $3`,
+        [draft.slot_id, snapshot.booking_date, hold.id]
+      )
+      
+      const totalBooked = (committedOrdersRes.rows[0]?.count || 0) + (activeHoldsRes.rows[0]?.count || 0)
+      if (totalBooked >= slot.max_orders) {
+        throw { statusCode: 409, message: 'Selected pickup slot is fully booked', code: 'SLOT_FULL' }
+      }
+
+      // 6. Generate collision-free order number LNDR-YYYYMMDD-RAND
       const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-      const pattern = `LNDR-${today}-%`
-      const seqRes = await client.query(`SELECT COUNT(*) FROM orders WHERE order_number LIKE $1`, [pattern])
-      const seq = parseInt(seqRes.rows[0].count, 10) + 1
-      const orderNumber = `LNDR-${today}-${String(seq).padStart(3, '0')}`
+      const randSuffix = Math.random().toString(36).substring(2, 5).toUpperCase()
+      const orderNumber = `LNDR-${today}-${randSuffix}`
 
       const subtotalRupees = (draft.payable_amount_paise - 2900 - 500) / 100
       const deliveryFeeRupees = 29.00
       const platformFeeRupees = 5.00
       const totalRupees = draft.payable_amount_paise / 100
 
+      // 7. Insert the order
       const orderInsertRes = await client.query(
         `INSERT INTO orders (
            id, order_number, user_id, vendor_id, status, items, subtotal, discount_amount,
@@ -1197,7 +1236,7 @@ export class OrdersService {
       )
       const order = orderInsertRes.rows[0]
 
-      // Insert garment lines into order_lines (replacing order_items / order_garment_lines)
+      // 8. Insert garment lines into order_lines
       for (const line of draft.garment_lines) {
         await client.query(
           `INSERT INTO order_lines (
@@ -1220,7 +1259,7 @@ export class OrdersService {
         )
       }
 
-      // Record Order Event
+      // 9. Record Order Event
       const { recordOrderEvent } = await import('../../utils/state-machine.js')
       await recordOrderEvent(client, {
         orderId: order.id,
@@ -1231,11 +1270,9 @@ export class OrdersService {
         note: 'Order placed from draft'
       })
 
-      // Link payment to real order
+      // 10. Link payment and consume hold
       await client.query('UPDATE payments SET order_id = $1 WHERE id = $2', [order.id, payment.id])
-
-      // Delete the slot hold
-      await client.query('DELETE FROM slot_holds WHERE customer_id = $1 AND slot_id = $2 AND vendor_id = $3 AND quote_id = $4', [userId, draft.slot_id, draft.vendor_id, snapshot.quote.quote_id || snapshot.quote.id])
+      await client.query('UPDATE slot_holds SET status = \'CONSUMED\' WHERE id = $1', [hold.id])
 
       await client.query('COMMIT')
 

@@ -32,7 +32,7 @@ export class DashboardRepository {
        FROM orders
        WHERE created_at >= NOW() - make_interval(days => $1)
          AND payment_status = 'PAID'
-         AND status != 'CANCELLED'
+         AND status NOT IN ('CANCELLED', 'PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')
        GROUP BY date
        ORDER BY date ASC`,
       [days]
@@ -65,17 +65,17 @@ export class DashboardRepository {
   async getTopProducts(limit = 10) {
     const { rows } = await query(
       `SELECT
-         p.id, p.name, p.thumbnail_url,
+         p.id, p.name,
          COUNT(oi.id)::int AS units_sold,
          COALESCE(SUM(oi.total), 0) AS revenue,
          c.name AS category
-       FROM order_items oi
-       JOIN garment_rates p ON p.id = oi.garment_rate_id
-       LEFT JOIN categories c ON c.id = p.category_id
+       FROM order_lines oi
+       JOIN garment_types p ON p.id = oi.garment_type_id
+       LEFT JOIN service_categories c ON c.id = p.category_id
        JOIN orders o ON o.id = oi.order_id
        WHERE o.created_at >= NOW() - INTERVAL '30 days'
          AND o.status = 'DELIVERED'
-       GROUP BY p.id, p.name, p.thumbnail_url, c.name
+       GROUP BY p.id, p.name, c.name
        ORDER BY revenue DESC
        LIMIT $1`,
       [limit]
@@ -87,25 +87,16 @@ export class DashboardRepository {
   }
 
   async getLowStockAlerts(threshold = 10) {
-    const { rows } = await query(
-      `SELECT id, name, thumbnail_url, stock_quantity, low_stock_threshold, category_id
-       FROM garment_rates
-       WHERE is_active = true
-         AND stock_quantity <= COALESCE(low_stock_threshold, $1)
-       ORDER BY stock_quantity ASC
-       LIMIT 50`,
-      [threshold]
-    )
-    return rows
+    return []
   }
 
   async getPendingActions() {
     const { rows } = await query(
       `SELECT
-         (SELECT COUNT(*) FROM orders WHERE status = 'PENDING')::int AS pending_orders,
-         (SELECT COUNT(*) FROM orders WHERE status = 'CONFIRMED')::int AS confirmed_orders,
+         (SELECT COUNT(*) FROM orders WHERE status = 'WAITING_VENDOR_CONFIRMATION')::int AS pending_orders,
+         (SELECT COUNT(*) FROM orders WHERE status = 'VENDOR_ACCEPTED')::int AS confirmed_orders,
          (SELECT COUNT(*) FROM rider_profiles WHERE is_approved = false)::int AS pending_riders,
-         (SELECT COUNT(*) FROM garment_rates WHERE is_active = true AND stock_quantity <= COALESCE(low_stock_threshold, 10))::int AS low_stock_products,
+         0::int AS low_stock_products,
          (SELECT COUNT(*) FROM rider_payouts WHERE status = 'PENDING')::int AS pending_payouts`
     )
     return rows[0]
@@ -124,11 +115,11 @@ export class DashboardRepository {
       `SELECT
          c.name AS category,
          COALESCE(SUM(oi.total), 0) AS revenue
-       FROM order_items oi
-       JOIN garment_rates p ON p.id = oi.garment_rate_id
-       JOIN categories c ON c.id = p.category_id
+       FROM order_lines oi
+       JOIN garment_types p ON p.id = oi.garment_type_id
+       JOIN service_categories c ON c.id = p.category_id
        JOIN orders o ON o.id = oi.order_id
-       WHERE o.status != 'CANCELLED'
+       WHERE o.status NOT IN ('CANCELLED', 'PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')
          AND o.payment_status = 'PAID'
          AND o.created_at >= NOW() - INTERVAL '30 days'
        GROUP BY c.name
@@ -164,18 +155,18 @@ export class DashboardRepository {
     const [current, previous, sparkline] = await Promise.all([
       query(
         `SELECT COALESCE(SUM(total_amount), 0) AS total
-         FROM orders WHERE payment_status = 'PAID' AND status != 'CANCELLED'
+         FROM orders WHERE payment_status = 'PAID' AND status NOT IN ('CANCELLED', 'PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')
            AND created_at >= $1`, [currentStart]
       ),
       query(
         `SELECT COALESCE(SUM(total_amount), 0) AS total
-         FROM orders WHERE payment_status = 'PAID' AND status != 'CANCELLED'
+         FROM orders WHERE payment_status = 'PAID' AND status NOT IN ('CANCELLED', 'PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')
            AND created_at >= $1 AND created_at < $2`, [previousStart, previousEnd]
       ),
       query(
         `SELECT COALESCE(SUM(total_amount), 0)::numeric AS rev
          FROM orders
-         WHERE payment_status = 'PAID' AND status != 'CANCELLED'
+         WHERE payment_status = 'PAID' AND status NOT IN ('CANCELLED', 'PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')
            AND created_at >= $1
          GROUP BY DATE(created_at AT TIME ZONE 'Asia/Kolkata')
          ORDER BY DATE(created_at AT TIME ZONE 'Asia/Kolkata') ASC`, [currentStart]
@@ -215,11 +206,11 @@ export class DashboardRepository {
   async _productStats(currentStart, previousStart, previousEnd) {
     const { rows } = await query(
       `SELECT
-         COUNT(*) FILTER (WHERE is_active = true)::int AS total,
-         COUNT(*) FILTER (WHERE is_active = true AND stock_quantity > COALESCE(low_stock_threshold, 10))::int AS active,
-         COUNT(*) FILTER (WHERE is_active = true AND stock_quantity = 0)::int AS out_of_stock,
-         COUNT(*) FILTER (WHERE is_active = true AND stock_quantity > 0 AND stock_quantity <= COALESCE(low_stock_threshold, 10))::int AS low_stock
-       FROM garment_rates`
+         COUNT(*)::int AS total,
+         COUNT(*) FILTER (WHERE is_active = true)::int AS active,
+         0::int AS out_of_stock,
+         0::int AS low_stock
+       FROM garment_types`
     )
     return rows[0]
   }
@@ -231,7 +222,7 @@ export class DashboardRepository {
       query(
         `SELECT COUNT(*)::int AS total FROM (
            SELECT user_id FROM orders
-           WHERE status != 'CANCELLED'
+           WHERE status NOT IN ('CANCELLED', 'PAYMENT_FAILED', 'VENDOR_REJECTED', 'AUTO_REJECTED', 'CUSTOMER_CANCELLED', 'ADMIN_CANCELLED', 'REFUNDED')
            GROUP BY user_id HAVING COUNT(*) > 1
          ) sub`
       ),

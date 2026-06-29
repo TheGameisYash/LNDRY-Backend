@@ -231,7 +231,7 @@ export const buildApp = async () => {
 
   // Rider Assignments — delivery partner / rider operations (LNDRY-API-001 canonical)
   await app.register(import('./modules/delivery/delivery.routes.js'), {
-    prefix: '/api/v1/rider/assignments',
+    prefix: '/api/v1/rider',
   })
   // DEPRECATED ALIAS — remove after frontend migration
   await app.register(async (subApp) => {
@@ -262,7 +262,10 @@ export const buildApp = async () => {
     prefix: '/api/v1',
   })
 
-  // Vendors — multi-vendor laundry marketplace
+  // Shops/Vendors CRUD and Admin review plugins
+  await app.register(import('./modules/shops/shops.routes.js'), {
+    prefix: '/api/v1/shops',
+  })
   await app.register(import('./modules/vendors/vendors.routes.js'), {
     prefix: '/api/v1/vendors',
   })
@@ -449,14 +452,14 @@ export const buildApp = async () => {
   // ─── CART ENHANCEMENT MODULES ──────────────────────────
 
   // Tip Presets (public)
-  // await app.register(import('./modules/tip-presets/tip-presets.routes.js'), {
-  //   prefix: '/api/v1/tip-presets',
-  // })
-  // 
-  // // Payment Offers (public)
-  // await app.register(import('./modules/payment-offers/payment-offers.routes.js'), {
-  //   prefix: '/api/v1/payment-offers',
-  // })
+  await app.register(import('./modules/tip-presets/tip-presets.routes.js'), {
+    prefix: '/api/v1/tip-presets',
+  })
+  
+  // Payment Offers (public)
+  await app.register(import('./modules/payment-offers/payment-offers.routes.js'), {
+    prefix: '/api/v1/payment-offers',
+  })
 
   // Fee Config (admin) — legacy row-per-type config (kept for backward compat)
   await app.register(import('./modules/fee-config/fee-config.routes.js'), {
@@ -469,16 +472,16 @@ export const buildApp = async () => {
   })
 
   // Tip Presets (admin)
-  // const { adminTipPresetsRoutes } = await import('./modules/tip-presets/tip-presets.routes.js')
-  // await app.register(adminTipPresetsRoutes, {
-  //   prefix: '/api/v1/admin/tip-presets',
-  // })
-  // 
-  // // Payment Offers (admin)
-  // const { adminPaymentOffersRoutes } = await import('./modules/payment-offers/payment-offers.routes.js')
-  // await app.register(adminPaymentOffersRoutes, {
-  //   prefix: '/api/v1/admin/payment-offers',
-  // })
+  const { adminTipPresetsRoutes } = await import('./modules/tip-presets/tip-presets.routes.js')
+  await app.register(adminTipPresetsRoutes, {
+    prefix: '/api/v1/admin/tip-presets',
+  })
+  
+  // Payment Offers (admin)
+  const { adminPaymentOffersRoutes } = await import('./modules/payment-offers/payment-offers.routes.js')
+  await app.register(adminPaymentOffersRoutes, {
+    prefix: '/api/v1/admin/payment-offers',
+  })
 
   // ─── RAZORPAY WEBHOOK (outside /api/v1 — no auth, no rate-limit) ──
   await app.register(async function razorpayWebhook(fastify) {

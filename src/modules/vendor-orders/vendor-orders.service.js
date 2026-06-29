@@ -615,7 +615,7 @@ export class VendorOrdersService {
 
     const statsRes = await query(
       `SELECT
-         COUNT(*) FILTER (WHERE status = 'WAITING_FOR_VENDOR_CONFIRMATION')::int AS pending_orders,
+         COUNT(*) FILTER (WHERE status = 'WAITING_VENDOR_CONFIRMATION')::int AS pending_orders,
          COUNT(*) FILTER (WHERE status = 'VENDOR_ACCEPTED')::int AS accepted_orders,
          COUNT(*) FILTER (WHERE status IN ('RECEIVED_AT_VENDOR', 'WASHING', 'DRYING', 'IRONING'))::int AS processing_orders,
          COUNT(*) FILTER (WHERE status = 'PACKED')::int AS packed_orders,

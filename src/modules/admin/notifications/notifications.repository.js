@@ -280,7 +280,7 @@ function buildSegmentWhere(segment, segmentValue) {
       return {
         where: `${customerBaseWhere} AND u.id IN (
           SELECT user_id FROM orders WHERE status = 'DELIVERED'
-          GROUP BY user_id HAVING SUM(total) >= 5000
+          GROUP BY user_id HAVING SUM(total_amount) >= 5000
         )`,
         params,
       }
@@ -315,7 +315,7 @@ function buildSegmentWhere(segment, segmentValue) {
     case 'cart_not_empty':
       return {
         where: `${customerBaseWhere} AND u.id IN (
-          SELECT DISTINCT user_id FROM cart_items
+          SELECT DISTINCT user_id FROM orders WHERE status = 'DRAFT'
         )`,
         params,
       }

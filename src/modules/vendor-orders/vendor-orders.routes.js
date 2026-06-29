@@ -44,7 +44,7 @@ export default async function vendorOrdersRoutes(fastify) {
           status: {
             type: 'string',
             enum: [
-              'WAITING_FOR_VENDOR_CONFIRMATION', 'VENDOR_ACCEPTED',
+              'WAITING_VENDOR_CONFIRMATION', 'VENDOR_ACCEPTED',
               'PICKUP_ASSIGNED', 'GOING_FOR_PICKUP', 'PICKUP_OTP_VERIFIED', 'PICKED_UP',
               'RECEIVED_AT_VENDOR', 'WASHING', 'DRYING', 'IRONING', 'PACKED',
               'DELIVERY_ASSIGNED', 'OUT_FOR_DELIVERY', 'DELIVERY_OTP_VERIFIED', 'DELIVERED',

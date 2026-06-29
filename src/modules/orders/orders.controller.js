@@ -134,4 +134,29 @@ export class OrdersController {
     }
     return reply.code(201).send(success(result, 'Order placed successfully'))
   }
+
+  async getOtp(request, reply) {
+    const { id: orderId } = request.params
+    const { purpose } = request.query
+    if (!purpose || !['PICKUP', 'DELIVERY'].includes(purpose)) {
+      return reply.code(400).send(error('purpose must be PICKUP or DELIVERY', 'INVALID_PURPOSE'))
+    }
+
+    try {
+      const { OrderOtpService } = await import('../order-otp/order-otp.service.js')
+      const otpService = new OrderOtpService()
+      const otpData = await otpService.getActiveOtpForCustomer(request.user.id, orderId, purpose)
+      if (!otpData) {
+        return reply.code(404).send(error('No active OTP found for this order and purpose', 'OTP_NOT_FOUND'))
+      }
+      
+      // Enforce Cache-Control no-store
+      reply.header('Cache-Control', 'no-store')
+      return reply.send(success(otpData, 'Active OTP fetched successfully'))
+    } catch (err) {
+      const statusCode = err.statusCode || 500
+      const code = err.code || 'OTP_FETCH_FAILED'
+      return reply.code(statusCode).send(error(err.message || 'Failed to fetch OTP', code))
+    }
+  }
 }
