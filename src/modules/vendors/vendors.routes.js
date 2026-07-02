@@ -156,4 +156,96 @@ export default async function vendorRoutes(fastify) {
       }
     }
   }, controller.previewKycDocument.bind(controller))
+
+  // GET /admin/watermark/settings
+  fastify.get('/admin/watermark/settings', {
+    preHandler: adminPreHandlers,
+    schema: {
+      tags: ['Admin Vendors'],
+      summary: 'Get watermark settings'
+    }
+  }, async (request, reply) => {
+    const { query: dbQuery } = await import('../../config/database.js')
+    const { rows } = await dbQuery('SELECT enabled, text, logo_url, position, scale, opacity FROM watermark_settings LIMIT 1')
+    return { status: 'success', data: rows[0] || { enabled: true, text: 'For LNDRY Verification Only', position: 'center', scale: 1.0, opacity: 0.4 } }
+  })
+
+  // PUT /admin/watermark/settings
+  fastify.put('/admin/watermark/settings', {
+    preHandler: adminPreHandlers,
+    schema: {
+      tags: ['Admin Vendors'],
+      summary: 'Update watermark settings',
+      body: {
+        type: 'object',
+        properties: {
+          enabled: { type: 'boolean' },
+          text: { type: 'string' },
+          position: { type: 'string' },
+          scale: { type: 'number' },
+          opacity: { type: 'number' }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    const { query: dbQuery } = await import('../../config/database.js')
+    const { enabled, text, position, scale, opacity } = request.body
+    await dbQuery(
+      `UPDATE watermark_settings 
+       SET enabled = $1, text = $2, position = $3, scale = $4, opacity = $5`,
+      [enabled, text, position, scale, opacity]
+    )
+    return { status: 'success', message: 'Watermark settings updated' }
+  })
+
+  // GET /admin/watermark/jobs
+  fastify.get('/admin/watermark/jobs', {
+    preHandler: adminPreHandlers,
+    schema: {
+      tags: ['Admin Vendors'],
+      summary: 'List watermark jobs'
+    }
+  }, async (request, reply) => {
+    const { query: dbQuery } = await import('../../config/database.js')
+    const { rows } = await dbQuery('SELECT id, asset_id, status, error_message, created_at, updated_at FROM watermark_jobs ORDER BY created_at DESC')
+    return { status: 'success', data: rows }
+  })
+
+  // POST /admin/watermark/jobs
+  fastify.post('/admin/watermark/jobs', {
+    preHandler: adminPreHandlers,
+    schema: {
+      tags: ['Admin Vendors'],
+      summary: 'Create a new watermark batch job',
+      body: {
+        type: 'object',
+        required: ['asset_id'],
+        properties: {
+          asset_id: { type: 'string' }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    const { query: dbQuery } = await import('../../config/database.js')
+    const { asset_id } = request.body
+    const { rows } = await dbQuery(
+      `INSERT INTO watermark_jobs (asset_id, status)
+       VALUES ($1, 'PENDING')
+       RETURNING *`,
+      [asset_id]
+    )
+
+    // Simulate background worker processing
+    setTimeout(async () => {
+      try {
+        await dbQuery(`UPDATE watermark_jobs SET status = 'PROCESSING' WHERE id = $1`, [rows[0].id])
+        await new Promise(r => setTimeout(r, 4000))
+        await dbQuery(`UPDATE watermark_jobs SET status = 'COMPLETED' WHERE id = $1`, [rows[0].id])
+      } catch (err) {
+        await dbQuery(`UPDATE watermark_jobs SET status = 'FAILED', error_message = $2 WHERE id = $1`, [rows[0].id, err.message])
+      }
+    }, 1000)
+
+    return reply.code(201).send({ status: 'success', data: rows[0], message: 'Watermark job scheduled successfully' })
+  })
 }

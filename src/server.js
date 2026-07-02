@@ -22,7 +22,7 @@ const validateProductionConfig = () => {
   }
 }
 
-// Trigger nodemon reload 2
+// Trigger nodemon reload 3
 const start = async () => {
   try {
     validateProductionConfig()

@@ -115,8 +115,8 @@ export class AdminReportsRepository {
     const dataResult = await query(
       `SELECT DATE(created_at) as date,
               SUM(total_amount) as gross_revenue,
-              SUM(CASE WHEN status = 'refunded' THEN total_amount ELSE 0 END) as refunded,
-              SUM(CASE WHEN status != 'refunded' THEN total_amount ELSE 0 END) as net_revenue
+              SUM(CASE WHEN status = 'REFUNDED' THEN total_amount ELSE 0 END) as refunded,
+              SUM(CASE WHEN status != 'REFUNDED' THEN total_amount ELSE 0 END) as net_revenue
        FROM orders ${where}
        GROUP BY DATE(created_at)
        ORDER BY date DESC
@@ -137,8 +137,8 @@ export class AdminReportsRepository {
     const offset = (page - 1) * limit
     const { conditions, values, nextIndex } = this._buildFilters(filters)
     const baseConditions = conditions.length > 0
-      ? [...conditions, "status = 'refunded'"]
-      : ["status = 'refunded'"]
+      ? [...conditions, "status = 'REFUNDED'"]
+      : ["status = 'REFUNDED'"]
     const where = `WHERE ${baseConditions.join(' AND ')}`
 
     const countResult = await query(

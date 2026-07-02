@@ -10,7 +10,7 @@ const pool = new Pool({
 async function run() {
     try {
         const res = await pool.query(`
-      SELECT id, email, role, platform_role, is_active FROM users WHERE email='admin@lndry.com'
+      SELECT id, email, role, platform_role, is_active FROM users
     `);
         console.table(res.rows);
     } catch (e) {
